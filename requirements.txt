@@ -7,4 +7,5 @@ pydub
 pyttsx3
 streamlit-webrtc
 numpy
-python-dotenv==1.0.0 
+python-dotenv==1.0.0
+audio-recorder-streamlit 
