@@ -93,73 +93,6 @@ def update_lesson_settings(lesson_name, key_phrase, vocab_list, extra_note):
 # エラーメッセージのスタイル定義
 ERROR_STYLE = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
-
-/* グローバル設定 */
-html, body {
-    font-family: 'Noto Sans JP', sans-serif;
-}
-
-/* サイドバーのカスタマイズ */
-.sidebar .sidebar-content {
-    background-color: #f8f9fa;
-    border-right: 1px solid #eaecef;
-}
-
-/* セクションタイトル */
-.sidebar h1, .sidebar h2, .sidebar h3, 
-main h1, main h2, main h3 {
-    color: #1e3a8a;
-    font-weight: 700;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
-}
-
-/* 入力フィールド */
-input[type="text"], textarea {
-    border-radius: 8px !important;
-    border: 1px solid #ddd !important;
-    padding: 0.5rem !important;
-    transition: all 0.3s ease !important;
-}
-
-input[type="text"]:focus, textarea:focus {
-    border-color: #4f46e5 !important;
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2) !important;
-}
-
-/* ボタンスタイル */
-button {
-    border-radius: 8px !important;
-    transition: all 0.3s ease !important;
-    text-transform: uppercase !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.5px !important;
-}
-
-button[kind="primary"] {
-    background-color: #4f46e5 !important;
-    border: none !important;
-}
-
-button[kind="primary"]:hover {
-    background-color: #4338ca !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    transform: translateY(-1px) !important;
-}
-
-button[kind="secondary"] {
-    border: 1px solid #4f46e5 !important;
-    color: #4f46e5 !important;
-    background-color: white !important;
-}
-
-button[kind="secondary"]:hover {
-    background-color: #f9fafb !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-}
-
-/* メッセージスタイル */
 .error-message {
     padding: 1rem;
     border-radius: 0.5rem;
@@ -167,8 +100,6 @@ button[kind="secondary"]:hover {
     border: 1px solid #ef4444;
     color: #dc2626;
     margin: 1rem 0;
-    animation: fadeIn 0.5s ease-in-out;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .warning-message {
     padding: 1rem;
@@ -177,8 +108,6 @@ button[kind="secondary"]:hover {
     border: 1px solid #f59e0b;
     color: #d97706;
     margin: 1rem 0;
-    animation: fadeIn 0.5s ease-in-out;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .info-message {
     padding: 1rem;
@@ -187,8 +116,6 @@ button[kind="secondary"]:hover {
     border: 1px solid #0ea5e9;
     color: #0284c7;
     margin: 1rem 0;
-    animation: fadeIn 0.5s ease-in-out;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .success-message {
     padding: 1rem;
@@ -197,40 +124,6 @@ button[kind="secondary"]:hover {
     border: 1px solid #22c55e;
     color: #16a34a;
     margin: 1rem 0;
-    animation: fadeIn 0.5s ease-in-out;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* アニメーション */
-@keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(-10px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideIn {
-    0% { opacity: 0; transform: translateX(-20px); }
-    100% { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideInRight {
-    0% { opacity: 0; transform: translateX(20px); }
-    100% { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-/* レスポンシブ調整 */
-@media (max-width: 768px) {
-    .chat-container {
-        padding: 10px !important;
-    }
-    .message-content {
-        max-width: 85% !important;
-    }
 }
 </style>
 """
@@ -411,12 +304,13 @@ def transcribe_audio(audio_bytes):
     return None
 
 # 簡易音声録音入力
-def simple_audio_input(on_audio_complete):
+def simple_audio_input(on_audio_complete, key_suffix=""):
     """
     Streamlitの音声録音コンポーネントを使用した簡易音声入力
     
     Args:
         on_audio_complete (func): 音声認識完了時のコールバック関数
+        key_suffix (str): コンポーネントのキーに追加するサフィックス
     """
     st.info("""
     ### 音声入力の使い方
@@ -427,26 +321,31 @@ def simple_audio_input(on_audio_complete):
     ※録音中は赤いボタンが表示されます
     """)
     
-    # 前回処理した音声データの管理
-    if "last_processed_audio" not in st.session_state:
-        st.session_state.last_processed_audio = None
+    # セッション状態の初期化
+    if f"audio_bytes_{key_suffix}" not in st.session_state:
+        st.session_state[f"audio_bytes_{key_suffix}"] = None
     
-    # audio_recorder_streamlitパッケージのコンポーネントを使用
+    # 音声録音コンポーネントの表示（セッション間で状態を保持するためにキーを使用）
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
-        icon_size="2x"
+        icon_size="2x",
+        key=f"audio_recorder_{key_suffix}"
     )
     
+    # 音声データがある場合は処理
     if audio_bytes:
-        # 音声データのハッシュを計算して一意のIDとして使用
-        audio_hash = hash(audio_bytes)
+        # ユーザーに音声を再生
+        st.audio(audio_bytes, format="audio/wav")
         
-        # 前回と同じ音声データでないことを確認
-        if audio_hash != st.session_state.last_processed_audio:
-            st.audio(audio_bytes, format="audio/wav")
+        # セッション状態を更新（処理済みマーク）
+        current_bytes = st.session_state.get(f"audio_bytes_{key_suffix}")
+        
+        # 新しい録音データの場合のみ処理（同じデータの重複処理を防止）
+        if current_bytes != audio_bytes:
+            st.session_state[f"audio_bytes_{key_suffix}"] = audio_bytes
             
             with st.spinner("音声を認識中..."):
                 # Whisper APIで音声認識
@@ -454,14 +353,9 @@ def simple_audio_input(on_audio_complete):
                 
                 if transcription:
                     show_success(f"音声認識結果: {transcription}")
-                    # 処理した音声データのIDを保存
-                    st.session_state.last_processed_audio = audio_hash
-                    # コールバック関数を呼び出し
                     on_audio_complete(transcription)
                 else:
                     show_error("音声認識に失敗しました。もう一度お試しください。")
-                    # エラーの場合も前回の音声IDを更新
-                    st.session_state.last_processed_audio = audio_hash
 
 # テキスト入力処理の修正
 def handle_text_input():
@@ -659,229 +553,72 @@ if mode == "通常会話モード":
     # カスタムCSS
     st.markdown("""
     <style>
-    /* ヘッダー部分 */
-    .salon-header {
-        background: linear-gradient(135deg, #6366f1, #3b82f6);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        text-align: center;
-    }
-
-    .salon-header h1 {
-        margin: 0;
-        font-size: 1.8rem;
-        color: white !important;
-    }
-
-    .salon-header p {
-        margin-top: 0.5rem;
-        opacity: 0.9;
-    }
-    
-    /* チャットコンテナ */
     .chat-container {
         max-width: 800px;
         margin: 0 auto;
         padding: 20px;
-        background-color: #f9fafb;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     }
-    
-    /* メッセージ */
     .message {
         display: flex;
         margin-bottom: 20px;
-        animation: fadeIn 0.5s ease;
     }
-    
     .message.staff {
         justify-content: flex-end;
     }
-    
     .message.customer {
         justify-content: flex-start;
     }
-    
-    /* アバター */
     .avatar {
-        width: 45px;
-        height: 45px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         margin: 0 10px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 20px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s ease;
     }
-    
-    .avatar:hover {
-        transform: scale(1.05);
-    }
-    
     .staff-avatar {
-        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        background-color: #007bff;
         color: white;
     }
-    
     .customer-avatar {
-        background: linear-gradient(135deg, #10b981, #34d399);
+        background-color: #28a745;
         color: white;
     }
-    
-    /* メッセージ内容 */
     .message-content {
         max-width: 70%;
-        padding: 12px 18px;
-        border-radius: 18px;
+        padding: 10px 15px;
+        border-radius: 20px;
         position: relative;
         word-wrap: break-word;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
-        line-height: 1.5;
     }
-    
     .staff .message-content {
-        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        background-color: #007bff;
         color: white;
         margin-right: 15px;
-        border-top-right-radius: 4px;
-        animation: slideInRight 0.3s ease;
     }
-    
     .customer .message-content {
-        background: white;
-        color: #374151;
+        background-color: #e9ecef;
+        color: black;
         margin-left: 15px;
-        border-top-left-radius: 4px;
-        animation: slideIn 0.3s ease;
     }
-    
-    /* タイムスタンプ */
     .message-time {
         font-size: 12px;
-        color: #6b7280;
+        color: #666;
         margin-top: 5px;
         text-align: center;
     }
-    
-    /* 入力エリア */
-    .chat-input-container {
+    .chat-input {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
         background: white;
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        margin-top: 20px;
-        border: 1px solid #e5e7eb;
-    }
-    
-    /* 入力方法セレクタ */
-    .input-method-selector {
-        display: flex;
-        align-items: center;
-        padding: 10px;
-        background-color: #f3f4f6;
-        border-radius: 8px;
-        margin-bottom: 15px;
-    }
-    
-    /* ボタン */
-    .send-button {
-        background: linear-gradient(135deg, #4f46e5, #6366f1);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 15px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .send-button:hover {
-        background: linear-gradient(135deg, #4338ca, #4f46e5);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    
-    .send-button:active {
-        transform: translateY(0);
-    }
-
-    /* 録音ボタン */
-    .record-button-container {
-        display: flex;
-        justify-content: center;
-        margin: 15px 0;
-    }
-    
-    /* 初期メッセージ */
-    .welcome-message {
-        text-align: center;
-        padding: 30px;
-        background-color: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        margin: 20px 0;
-        animation: pulse 2s infinite;
-    }
-    
-    .welcome-message h3 {
-        color: #4f46e5;
-        margin-bottom: 10px;
-    }
-    
-    .welcome-message p {
-        color: #6b7280;
-    }
-    
-    /* 音声認識中インジケータ */
-    .recognizing {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 10px;
-        background-color: #f9fafb;
-        border-radius: 8px;
-        margin: 10px 0;
-    }
-    
-    .recognizing .dot {
-        width: 8px;
-        height: 8px;
-        margin: 0 3px;
-        background-color: #4f46e5;
-        border-radius: 50%;
-        animation: dotPulse 1.5s infinite ease-in-out;
-    }
-    
-    .recognizing .dot:nth-child(2) {
-        animation-delay: 0.2s;
-    }
-    
-    .recognizing .dot:nth-child(3) {
-        animation-delay: 0.4s;
-    }
-    
-    @keyframes dotPulse {
-        0%, 60%, 100% { transform: scale(1); opacity: 0.5; }
-        30% { transform: scale(1.5); opacity: 1; }
+        padding: 20px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
     }
     </style>
-    """, unsafe_allow_html=True)
-    
-    # ヘッダー部分
-    st.markdown(f"""
-    <div class="salon-header">
-        <h1>{APP_TITLE} - {session.lesson_name}</h1>
-        <p>キーフレーズ: {session.key_phrase}</p>
-    </div>
     """, unsafe_allow_html=True)
     
     # 会話履歴表示
@@ -889,24 +626,15 @@ if mode == "通常会話モード":
     
     # 会話が空の場合のメッセージ
     if not st.session_state.session.conversation_history:
-        st.markdown("""
-        <div class="welcome-message">
-            <h3>👋 会話を始めましょう！</h3>
-            <p>下のテキスト入力または音声入力から会話を開始できます</p>
-            <p>今日のキーフレーズを積極的に使ってみましょう</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("👋 会話を始めましょう！")
     
     # 会話履歴の表示
     for i, (speaker, text) in enumerate(st.session_state.session.conversation_history):
-        timestamp = datetime.now().strftime("%H:%M")
-        
         if speaker == "あなた（スタッフ）":
             st.markdown(f"""
             <div class="message staff">
                 <div class="message-content">
                     {text}
-                    <div class="message-time">{timestamp}</div>
                 </div>
                 <div class="avatar staff-avatar">👤</div>
             </div>
@@ -917,7 +645,6 @@ if mode == "通常会話モード":
                 <div class="avatar customer-avatar">👤</div>
                 <div class="message-content">
                     {text}
-                    <div class="message-time">{timestamp}</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -930,9 +657,6 @@ if mode == "通常会話モード":
                     show_error(f"音声再生中にエラーが発生しました: {str(e)}")
     
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # 入力エリアのコンテナ
-    st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
     
     # 入力方法の選択
     is_voice_input = render_input_method_selector()
@@ -957,145 +681,12 @@ if mode == "通常会話モード":
                     show_error("AI応答の生成に失敗しました。もう一度お試しください。")
         
         # 新しい音声入力コンポーネントを使用
-        simple_audio_input(on_audio_complete)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+        simple_audio_input(on_audio_complete, key_suffix="conversation")
 
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
-    # カスタムCSS for ダイアログモード
-    st.markdown("""
-    <style>
-    /* ダイアログ練習モードスタイル */
-    .dialog-header {
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        text-align: center;
-    }
-
-    .dialog-container {
-        background-color: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        margin-bottom: 20px;
-    }
-    
-    .dialog-line {
-        padding: 10px;
-        margin: 10px 0;
-        border-radius: 8px;
-        transition: all 0.3s ease;
-    }
-    
-    .dialog-line.current {
-        background-color: #f0f9ff;
-        border-left: 4px solid #3b82f6;
-        padding-left: 15px;
-        transform: scale(1.02);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        animation: pulse 2s infinite;
-    }
-    
-    .dialog-role {
-        font-weight: 600;
-        color: #1e40af;
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 4px;
-        background-color: #dbeafe;
-        margin-right: 10px;
-    }
-    
-    .customer-role {
-        color: #166534;
-        background-color: #dcfce7;
-    }
-    
-    .dialog-text {
-        font-size: 1.05rem;
-        color: #374151;
-    }
-    
-    .dialog-progress-container {
-        margin: 20px 0;
-        padding: 10px;
-        background-color: #f9fafb;
-        border-radius: 8px;
-    }
-    
-    .your-turn-container {
-        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-        border-radius: 12px;
-        padding: 20px;
-        margin: 20px 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        animation: pulse 2s infinite;
-        text-align: center;
-    }
-    
-    .your-turn-container h3 {
-        color: #1e40af;
-        margin-bottom: 10px;
-    }
-    
-    .your-turn-container .target-text {
-        font-size: 1.2rem;
-        padding: 15px;
-        background-color: white;
-        border-radius: 8px;
-        margin: 10px 0;
-        color: #1e3a8a;
-        font-weight: 500;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    
-    .complete-message {
-        background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-        color: #166534;
-        padding: 20px;
-        border-radius: 12px;
-        text-align: center;
-        margin: 20px 0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    }
-    
-    .complete-message h2 {
-        color: #166534;
-        margin-bottom: 10px;
-    }
-    
-    .restart-button {
-        background-color: #10b981;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 20px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 500;
-        margin-top: 10px;
-    }
-    
-    .restart-button:hover {
-        background-color: #059669;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # ヘッダー
-    st.markdown("""
-    <div class="dialog-header">
-        <h1>ダイアログ練習モード</h1>
-        <p>実際の会話のように、音声で練習できます。あなたの番になったら、録音ボタンを押して話してください。</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.subheader("ダイアログ練習モード")
+    show_info("実際の会話のように、音声で練習できます。あなたの番になったら、録音ボタンを押して話してください。")
     
     # 現在の進行状況を管理
     if "dialog_progress" not in st.session_state:
@@ -1109,25 +700,23 @@ if mode == "ダイアログ練習モード":
     current_position = st.session_state.dialog_progress
     
     # 進行状況の表示
-    st.markdown('<div class="dialog-progress-container">', unsafe_allow_html=True)
     progress = current_position / len(dialog_lines) if dialog_lines else 0
     progress_bar = st.progress(progress)
-    st.markdown(f'<p style="text-align: center; color: #6b7280;">進捗状況: {int(progress * 100)}%</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("---")
     
     # ダイアログの表示と実行
-    st.markdown('<div class="dialog-container">', unsafe_allow_html=True)
     for i, line in enumerate(dialog_lines):
-        current_class = "current" if i == current_position else ""
-        role_class = "customer-role" if line["role"] == "Customer" else ""
-        
-        st.markdown(f"""
-        <div class="dialog-line {current_class}">
-            <span class="dialog-role {role_class}">{line["role"]}</span>
-            <span class="dialog-text">{line["text"]}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            st.markdown(f"**{line['role']}**")
+        with col2:
+            # 現在の行を強調表示
+            if i == current_position:
+                st.markdown(f"🎯 **{line['text']}**")
+            else:
+                st.markdown(line["text"])
+    
+    st.markdown("---")
     
     # 現在の行の処理
     if current_position < len(dialog_lines):
@@ -1149,13 +738,8 @@ if mode == "ダイアログ練習モード":
         
         # ユーザーの番の場合
         else:
-            st.markdown("""
-            <div class="your-turn-container">
-                <h3>🎤 あなたの番です</h3>
-                <p>次のセリフを話してください:</p>
-                <div class="target-text">""" + current_line["text"] + """</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("### あなたの番です")
+            st.markdown(f"🎯 次のセリフを話してください: **{current_line['text']}**")
             
             # 音声録音処理
             def on_dialog_audio_complete(text):
@@ -1167,18 +751,12 @@ if mode == "ダイアログ練習モード":
                     st.rerun()
             
             # 新しい音声入力コンポーネントを使用
-            simple_audio_input(on_dialog_audio_complete)
+            simple_audio_input(on_dialog_audio_complete, key_suffix="dialog")
     
     # ダイアログ完了時
     else:
-        st.markdown("""
-        <div class="complete-message">
-            <h2>🎉 おめでとうございます！</h2>
-            <p>ダイアログを完了しました。もう一度練習して英会話スキルを向上させましょう。</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("もう一度練習する", key="restart_button", on_click=lambda: None):
+        show_success("🎉 おめでとうございます！ダイアログを完了しました。")
+        if st.button("もう一度練習する", key="restart_button"):
             st.session_state.dialog_progress = 0
             st.session_state.last_played_line = -1
             st.rerun()
