@@ -415,6 +415,9 @@ session = st.session_state.session_state
 # メインタイトル
 st.title(f"{APP_TITLE} - {session.lesson_name} 復習")
 
+# モード選択
+mode = st.sidebar.radio("モード選択", ["通常会話モード", "ダイアログ練習モード"])
+
 # サイドバーの設定
 with st.sidebar:
     st.header("AIプロンプト設定（レッスン編集）")
