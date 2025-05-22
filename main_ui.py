@@ -94,11 +94,12 @@ class Recorder(AudioProcessorBase):
 def record_5sec_and_send(client, on_transcript):
     if 'recording' not in st.session_state:
         st.session_state['recording'] = False
-    if st.button("録音開始"):
+    if st.button("録音開始") and not st.session_state['recording']:
         st.session_state['recording'] = True
         st.session_state['audio_sent'] = False
 
     if st.session_state.get('recording', False):
+        st.info("5秒間自動で録音します。録音中は話してください。録音が終わると自動で認識されます。")
         webrtc_ctx = webrtc_streamer(
             key="audio-5sec",
             mode=WebRtcMode.SENDONLY,
