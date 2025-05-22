@@ -525,21 +525,43 @@ def generate_ai_response(user_input, conversation_history):
 def handle_text_input():
     """テキスト入力の処理を行う"""
     col1, col2 = st.columns([5, 1])
+    
+    # 送信ボタンの状態を管理
+    if "send_pressed" not in st.session_state:
+        st.session_state.send_pressed = False
+    
+    # メッセージ入力の状態を管理
+    if "message" not in st.session_state:
+        st.session_state.message = ""
+    
+    def on_message_change():
+        """メッセージ入力時のコールバック"""
+        st.session_state.send_pressed = False
+    
+    def on_send_click():
+        """送信ボタンクリック時のコールバック"""
+        st.session_state.send_pressed = True
+    
     with col1:
         # キーを使用してテキスト入力を作成
-        st.text_input("", placeholder="メッセージを入力...", key="input_message")
+        message = st.text_input(
+            "",
+            key="input_field",
+            placeholder="メッセージを入力...",
+            value=st.session_state.message,
+            on_change=on_message_change
+        )
+    
     with col2:
-        send_button = st.button("送信 💬")
+        send_button = st.button("送信 💬", on_click=on_send_click)
     
     # 送信処理
-    if send_button and st.session_state.input_message.strip():
-        current_input = st.session_state.input_message
-        
+    if st.session_state.send_pressed and message.strip():
         # ユーザーの発言を会話履歴に追加
-        st.session_state.session.conversation_history.append(("あなた（スタッフ）", current_input))
+        st.session_state.session.conversation_history.append(("あなた（スタッフ）", message))
         
         # AI応答を生成
-        ai_reply = generate_ai_response(current_input, st.session_state.session.conversation_history[:-1])
+        ai_reply = generate_ai_response(message, st.session_state.session.conversation_history[:-1])
         if ai_reply:
             # AIの応答を会話履歴に追加
             st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
@@ -547,8 +569,10 @@ def handle_text_input():
         else:
             show_error("AI応答の生成に失敗しました。もう一度お試しください。")
         
-        # 入力欄をクリア（次回のrerunで反映される）
-        st.session_state.input_message = ""
+        # 入力欄をクリア
+        st.session_state.message = ""
+        st.session_state.send_pressed = False
+        st.rerun()
 
 # 通常会話モードの処理
 if mode == "通常会話モード":
