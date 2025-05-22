@@ -307,36 +307,67 @@ def transcribe_audio(audio_bytes):
 def simple_audio_input(on_audio_complete, key_suffix=""):
     """
     Streamlitの音声録音コンポーネントを使用した簡易音声入力
+    マイク許可と録音を分離したUIを提供
     
     Args:
         on_audio_complete (func): 音声認識完了時のコールバック関数
         key_suffix (str): コンポーネントのキーに追加するサフィックス
     """
-    st.info("""
-    ### 音声入力の使い方
-    1. 「録音」ボタンをクリックしてマイクへのアクセスを許可してください
-    2. 話し終わったら再度ボタンをクリックして録音を停止します
-    3. 自動的に音声認識が行われます
-    
-    ※録音中は赤いボタンが表示されます
-    """)
-    
     # セッション状態の初期化
+    if f"is_recording_{key_suffix}" not in st.session_state:
+        st.session_state[f"is_recording_{key_suffix}"] = False
+    
     if f"audio_bytes_{key_suffix}" not in st.session_state:
         st.session_state[f"audio_bytes_{key_suffix}"] = None
     
-    # 音声録音コンポーネントの表示（セッション間で状態を保持するためにキーを使用）
+    # マイク許可と録音ボタンを分離したUI
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # マイク許可ボタン
+        st.button(
+            "マイク許可を確認 🎤",
+            help="クリックするとマイクへのアクセス許可を確認します。録音は開始されません。",
+            key=f"mic_check_{key_suffix}"
+        )
+    
+    with col2:
+        # 録音ボタン
+        recording_state = st.session_state[f"is_recording_{key_suffix}"]
+        button_label = "録音停止 ⏹" if recording_state else "録音開始 ⏺"
+        button_color = "#e74c3c" if recording_state else "#3498db"
+        
+        # 録音状態をトグルするボタン
+        if st.button(
+            button_label,
+            key=f"record_button_{key_suffix}",
+            help="クリックして録音を開始/停止します"
+        ):
+            st.session_state[f"is_recording_{key_suffix}"] = not recording_state
+            st.rerun()
+    
+    # 録音状態の表示
+    if st.session_state[f"is_recording_{key_suffix}"]:
+        st.warning("⏺ 録音中... 話し終わったら「録音停止」をクリックしてください")
+    else:
+        st.info("🎤 「録音開始」をクリックして話してください")
+    
+    # 実際の音声録音コンポーネント（非表示モード）
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
-        icon_size="2x",
-        key=f"audio_recorder_{key_suffix}"
+        icon_size="0x",  # サイズを0にして非表示に
+        key=f"audio_recorder_{key_suffix}",
+        recording=st.session_state[f"is_recording_{key_suffix}"]
     )
     
     # 音声データがある場合は処理
     if audio_bytes:
+        # 録音停止
+        st.session_state[f"is_recording_{key_suffix}"] = False
+        
         # ユーザーに音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
