@@ -318,31 +318,30 @@ if mode == "通常会話モード":
     else:
         # 音声入力
         def on_transcript(text):
+            if not client:
+                st.error("OpenAI APIキーが設定されていません。サイドバー上部でAPIキーを設定してください。")
+                return
             st.session_state.history.append(("あなた（スタッフ）", text))
             # ChatGPT APIでAI応答生成
-            if client:
-                try:
-                    st.info("AI応答生成中...")
-                    response = client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
-                               "content": t} 
-                              for speaker, t in st.session_state.history[:-1]],
-                            {"role": "user", "content": text}
-                        ],
-                        temperature=0.7,
-                        max_tokens=150
-                    )
-                    ai_reply = response.choices[0].message.content
-                    st.success(f"AI（お客様）の返答: {ai_reply}")
-                except Exception as e:
-                    st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
-                    ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
-            else:
-                st.error("OpenAI APIキーが設定されていません。")
-                ai_reply = "APIキーを設定してください。"
+            try:
+                st.info("AI応答生成中...")
+                response = client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
+                           "content": t} 
+                          for speaker, t in st.session_state.history[:-1]],
+                        {"role": "user", "content": text}
+                    ],
+                    temperature=0.7,
+                    max_tokens=150
+                )
+                ai_reply = response.choices[0].message.content
+                st.success(f"AI（お客様）の返答: {ai_reply}")
+            except Exception as e:
+                st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
+                ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
             st.session_state.history.append(("AI（お客様）", ai_reply))
             # AI応答を音声で再生
             speak_text(ai_reply)
