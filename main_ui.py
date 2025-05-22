@@ -59,10 +59,18 @@ def speak_text(text):
             b64 = base64.b64encode(audio_bytes).decode()
             md_audio = f'''
             <div style="margin: 10px 0;">
-                <p style="margin-bottom: 5px;">🔊 下のプレーヤーをクリックして音声を再生してください：</p>
-                <audio controls src="data:audio/mp3;base64,{b64}">
+                <p style="margin-bottom: 5px;">🔊 音声を再生します：</p>
+                <audio controls autoplay src="data:audio/mp3;base64,{b64}" onplay="console.log('Audio started playing')" onerror="console.error('Audio playback failed')">
                     お使いのブラウザは音声再生をサポートしていません。
                 </audio>
+                <script>
+                    // 自動再生の試行
+                    document.querySelector('audio').play().catch(function(error) {{
+                        console.log('自動再生できませんでした:', error);
+                        // エラーメッセージを表示
+                        document.querySelector('p').textContent = '🔊 音声を再生するにはプレーヤーをクリックしてください：';
+                    }});
+                </script>
             </div>
             '''
             st.markdown(md_audio, unsafe_allow_html=True)
