@@ -738,10 +738,23 @@ if mode == "ダイアログ練習モード":
                 try:
                     if speak_text(current_line["text"]):
                         st.session_state.last_played_line = current_position
-                        # 一定時間後に次の行に進む
-                        time.sleep(0.5)  # 安定のため少し待機
-                        st.session_state.dialog_progress += 1
-                        st.rerun()
+                        
+                        # 音声の長さを推定（日本語と英語の発話速度を考慮）
+                        # 英語は平均で1分間に約150単語、1単語あたり約0.4秒
+                        # 余裕を持って単語数 * 0.5秒 + 1秒のベース時間
+                        word_count = len(current_line["text"].split())
+                        estimated_duration = word_count * 0.5 + 1.0
+                        
+                        # 音声再生中の表示
+                        with st.spinner(f"音声再生中... ({estimated_duration:.1f}秒)"):
+                            # 推定された時間だけ待機
+                            time.sleep(estimated_duration)
+                        
+                        # 「次へ」ボタンを表示して、ユーザーが確認してから次に進めるようにする
+                        st.success("音声再生完了")
+                        if st.button("次へ進む ▶", key=f"next_btn_{current_position}"):
+                            st.session_state.dialog_progress += 1
+                            st.rerun()
                 except Exception as e:
                     show_error(f"音声の再生に失敗しました: {str(e)}")
         
