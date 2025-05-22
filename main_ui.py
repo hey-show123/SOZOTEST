@@ -125,7 +125,12 @@ def record_5sec_and_send(client, on_transcript):
                                 model="whisper-1",
                                 file=f
                             )
-                            on_transcript(transcript.text)
+                            recognized_text = transcript.text
+                            if not recognized_text or recognized_text.strip() == "":
+                                st.error("音声が認識できませんでした。もう一度録音してください。")
+                            else:
+                                st.success(f"あなた（スタッフ）の発話: {recognized_text}")
+                                on_transcript(recognized_text)
                         st.session_state['audio_sent'] = True
                     st.session_state['recording'] = False
                     # os.unlink(audio_file)  # 必要なら削除
@@ -330,26 +335,30 @@ if mode == "通常会話モード":
         # 音声入力
         def on_transcript(text):
             st.session_state.history.append(("あなた（スタッフ）", text))
-            # ChatGPT APIを使用してAI応答を生成
+            # ChatGPT APIでAI応答生成
             if client:
                 try:
+                    st.info("AI応答生成中...")
                     response = client.chat.completions.create(
                         model="gpt-4",
                         messages=[
                             {"role": "system", "content": system_prompt},
                             *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
-                               "content": text} 
-                              for speaker, text in st.session_state.history[:-1]],
+                               "content": t} 
+                              for speaker, t in st.session_state.history[:-1]],
                             {"role": "user", "content": text}
                         ],
                         temperature=0.7,
                         max_tokens=150
                     )
                     ai_reply = response.choices[0].message.content
+                    st.success(f"AI（お客様）の返答: {ai_reply}")
                 except Exception as e:
                     st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
                     ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
-            
+            else:
+                st.error("OpenAI APIキーが設定されていません。")
+                ai_reply = "APIキーを設定してください。"
             st.session_state.history.append(("AI（お客様）", ai_reply))
             # AI応答を音声で再生
             speak_text(ai_reply)
@@ -402,8 +411,12 @@ if mode == "ダイアログ練習モード":
             st.markdown("### あなたの番です")
             st.markdown(f"🎯 次のセリフを話してください: **{current_line['text']}**")
             def on_transcript(text):
+                if not text or text.strip() == "":
+                    st.error("音声が認識できませんでした。もう一度録音してください。")
+                    return
+                st.success(f"あなたの発話: {text}")
                 # 発音チェック・進行処理（省略）
-                pass
+                # ここでAI応答や進行を追加可能
             record_5sec_and_send(client, on_transcript)
     
     # ダイアログ完了時
