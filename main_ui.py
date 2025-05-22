@@ -200,6 +200,26 @@ else:
 
 st.markdown("---")
 
+# --- 録音UIを常時表示する関数 ---
+def get_audio_file_from_webrtc():
+    st.info("下の録音UIで『START』を押して話し、終わったら『STOP』を押してください。STOP後に音声認識が実行されます。")
+    webrtc_ctx = webrtc_streamer(
+        key="audio",
+        mode=WebRtcMode.SENDONLY,
+        audio_receiver_size=1024,
+        media_stream_constraints={"audio": True, "video": False},
+        async_processing=True,
+    )
+    audio_file = None
+    if webrtc_ctx.audio_receiver:
+        audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
+        if audio_frames:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                for frame in audio_frames:
+                    f.write(frame.to_ndarray().tobytes())
+                audio_file = f.name
+    return audio_file
+
 # --- 通常会話モード ---
 if mode == "通常会話モード":
     # 会話履歴の初期化
@@ -275,42 +295,38 @@ if mode == "通常会話モード":
             st.rerun()
     else:
         # 音声入力
-        if st.button("🎤 音声入力開始"):
-            audio_file = record_audio_webrtc()
-            if audio_file and client:
-                with open(audio_file, "rb") as f:
-                    # WhisperでSTT
-                    transcript = client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=f
+        audio_file = get_audio_file_from_webrtc()
+        if st.button("音声認識を実行") and audio_file and client:
+            with open(audio_file, "rb") as f:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=f
+                )
+                user_input = transcript.text
+                st.session_state.history.append(("あなた（スタッフ）", user_input))
+                # ChatGPT APIを使用してAI応答を生成
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
+                               "content": text} 
+                              for speaker, text in st.session_state.history[:-1]],
+                            {"role": "user", "content": user_input}
+                        ],
+                        temperature=0.7,
+                        max_tokens=150
                     )
-                    user_input = transcript.text
-                    st.session_state.history.append(("あなた（スタッフ）", user_input))
-                    
-                    # ChatGPT APIを使用してAI応答を生成
-                    try:
-                        response = client.chat.completions.create(
-                            model="gpt-4",
-                            messages=[
-                                {"role": "system", "content": system_prompt},
-                                *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
-                                   "content": text} 
-                                  for speaker, text in st.session_state.history[:-1]],
-                                {"role": "user", "content": user_input}
-                            ],
-                            temperature=0.7,
-                            max_tokens=150
-                        )
-                        ai_reply = response.choices[0].message.content
-                    except Exception as e:
-                        st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
-                        ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
-                    
-                    st.session_state.history.append(("AI（お客様）", ai_reply))
-                    # AI応答を音声で再生
-                    speak_text(ai_reply)
-                    st.rerun()
-                os.unlink(audio_file)  # 一時ファイルを削除
+                    ai_reply = response.choices[0].message.content
+                except Exception as e:
+                    st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
+                    ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
+                
+                st.session_state.history.append(("AI（お客様）", ai_reply))
+                # AI応答を音声で再生
+                speak_text(ai_reply)
+            os.unlink(audio_file)
 
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
@@ -358,41 +374,34 @@ if mode == "ダイアログ練習モード":
         else:
             st.markdown("### あなたの番です")
             st.markdown(f"🎯 次のセリフを話してください: **{current_line['text']}**")
-            
-            # 音声入力ボタン
-            if st.button("🎤 マイクで話す", key=f"mic_button_{current_position}"):
-                audio_file = record_audio_webrtc()
-                if audio_file and client:
-                    with open(audio_file, "rb") as f:
-                        # WhisperでSTT
-                        transcript = client.audio.transcriptions.create(
-                            model="whisper-1",
-                            file=f
-                        )
-                        user_input = transcript.text
-                        
-                        # 発音の正確さをチェック（簡易的な文字列比較）
-                        target_text = current_line["text"].lower().strip().strip(",.!?")
-                        user_text = user_input.lower().strip().strip(",.!?")
-                        
-                        similarity = len(set(target_text.split()) & set(user_text.split())) / len(set(target_text.split()))
-                        
-                        if similarity >= 0.7:  # 70%以上の単語が一致
-                            st.success(f"✨ 素晴らしい発音です！\n\nあなた: {user_input}")
-                            st.session_state.dialog_progress += 1
-                            st.rerun()
-                        else:
-                            st.warning(f"""
-                            もう一度試してみましょう！
-                            
-                            目標: {current_line['text']}
-                            認識: {user_input}
-                            
-                            ヒント: ゆっくりはっきりと話してみてください。
-                            """)
+            audio_file = get_audio_file_from_webrtc()
+            if st.button("音声認識を実行", key=f"recognize_{current_position}") and audio_file and client:
+                with open(audio_file, "rb") as f:
+                    transcript = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=f
+                    )
+                    user_input = transcript.text
+                    # 発音の正確さをチェック（簡易的な文字列比較）
+                    target_text = current_line["text"].lower().strip().strip(",.!?")
+                    user_text = user_input.lower().strip().strip(",.!?")
                     
-                    # 一時ファイルを削除
-                    os.unlink(audio_file)
+                    similarity = len(set(target_text.split()) & set(user_text.split())) / len(set(target_text.split()))
+                    
+                    if similarity >= 0.7:  # 70%以上の単語が一致
+                        st.success(f"✨ 素晴らしい発音です！\n\nあなた: {user_input}")
+                        st.session_state.dialog_progress += 1
+                        st.rerun()
+                    else:
+                        st.warning(f"""
+                        もう一度試してみましょう！
+                        
+                        目標: {current_line['text']}
+                        認識: {user_input}
+                        
+                        ヒント: ゆっくりはっきりと話してみてください。
+                        """)
+                os.unlink(audio_file)
     
     # ダイアログ完了時
     else:
