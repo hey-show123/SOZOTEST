@@ -1,4 +1,12 @@
 import streamlit as st
+
+# Streamlitページ設定（必ず最初に実行）
+st.set_page_config(
+    page_title="英会話学習サービス - Lesson 29",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
 import os
 from dotenv import load_dotenv
 from io import BytesIO
@@ -388,13 +396,6 @@ def render_input_method_selector():
         else:
             show_info("録音ボタンを押して話しかけてください（5秒間）")
     return input_method == "🎤 音声"
-
-# アプリケーションの初期化
-st.set_page_config(
-    page_title=f"{APP_TITLE} - {DEFAULT_LESSON}",
-    layout="centered",
-    initial_sidebar_state="expanded"
-)
 
 # セッション状態の初期化
 initialize_session_state()
