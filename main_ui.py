@@ -482,6 +482,45 @@ def generate_system_prompt():
 - 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
 """
 
+# ChatGPT APIを使用してAI応答を生成する関数
+def generate_ai_response(user_input, conversation_history):
+    """
+    ユーザーの入力とこれまでの会話履歴を基にAI応答を生成する
+    
+    Args:
+        user_input (str): ユーザーの入力テキスト
+        conversation_history (list): これまでの会話履歴
+    
+    Returns:
+        str: 生成されたAI応答。エラー時はNone
+    """
+    if not client:
+        show_error("OpenAI APIキーが設定されていません。")
+        return None
+    
+    try:
+        # システムプロンプトを生成
+        system_prompt = generate_system_prompt()
+        
+        # ChatGPT APIを使用して応答を生成
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo-0125",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
+                   "content": text} 
+                  for speaker, text in conversation_history],
+                {"role": "user", "content": user_input}
+            ],
+            temperature=0.7,
+            max_tokens=150
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        show_error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
+        return None
+
 # テキスト入力処理の修正
 def handle_text_input():
     """テキスト入力の処理を行う"""
