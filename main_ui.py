@@ -320,9 +320,12 @@ def simple_audio_input(on_audio_complete):
     ※録音中は赤いボタンが表示されます
     """)
     
-    # 前回処理した音声データの管理
-    if "last_processed_audio" not in st.session_state:
-        st.session_state.last_processed_audio = None
+    # 音声処理の重複防止用状態管理
+    if "last_audio_timestamp" not in st.session_state:
+        st.session_state.last_audio_timestamp = 0
+    
+    # 現在のタイムスタンプを生成
+    current_timestamp = int(time.time() * 1000)
     
     # audio_recorder_streamlitパッケージのコンポーネントを使用
     audio_bytes = audio_recorder(
@@ -330,15 +333,13 @@ def simple_audio_input(on_audio_complete):
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
-        icon_size="2x"
+        icon_size="2x",
+        key=f"audio_recorder_{current_timestamp % 10000}"  # キーを定期的に変更
     )
     
     if audio_bytes:
-        # 音声データのハッシュを計算して一意のIDとして使用
-        audio_hash = hash(audio_bytes)
-        
-        # 前回と同じ音声データでないことを確認
-        if audio_hash != st.session_state.last_processed_audio:
+        # 最小間隔（1秒）以上経過していることを確認
+        if current_timestamp - st.session_state.last_audio_timestamp > 1000:
             st.audio(audio_bytes, format="audio/wav")
             
             with st.spinner("音声を認識中..."):
@@ -347,14 +348,14 @@ def simple_audio_input(on_audio_complete):
                 
                 if transcription:
                     show_success(f"音声認識結果: {transcription}")
-                    # 処理した音声データのIDを保存
-                    st.session_state.last_processed_audio = audio_hash
+                    # 現在のタイムスタンプを保存
+                    st.session_state.last_audio_timestamp = current_timestamp
                     # コールバック関数を呼び出し
                     on_audio_complete(transcription)
                 else:
                     show_error("音声認識に失敗しました。もう一度お試しください。")
-                    # エラーの場合も前回の音声IDを更新
-                    st.session_state.last_processed_audio = audio_hash
+                    # エラーの場合もタイムスタンプを更新
+                    st.session_state.last_audio_timestamp = current_timestamp
 
 # テキスト入力処理の修正
 def handle_text_input():
