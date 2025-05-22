@@ -23,6 +23,45 @@ from audio_recorder_streamlit import audio_recorder
 # .envからAPIキーを読み込む
 load_dotenv()
 
+# マイク初期化用のJavaScriptコード
+def initialize_microphone():
+    """ページ読み込み時にマイクの許可を求めるJavaScriptを実行"""
+    mic_init_js = """
+    <script>
+    // ページ読み込み完了時に実行
+    document.addEventListener('DOMContentLoaded', function() {
+        // 非表示の音声コンポーネントを作成
+        let initAudio = document.createElement('audio');
+        initAudio.style.display = 'none';
+        
+        // マイクへのアクセスを試みる関数
+        const requestMicrophoneAccess = async () => {
+            try {
+                console.log("マイクへのアクセスを要求中...");
+                // マイクへのアクセスを要求
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("マイクへのアクセス許可が完了しました");
+                
+                // ストリームを停止（初期化のみが目的）
+                stream.getTracks().forEach(track => track.stop());
+                
+                // 一度許可されたことをセッションストレージに記録
+                sessionStorage.setItem('microphoneInitialized', 'true');
+            } catch (error) {
+                console.error("マイクへのアクセスが拒否されました:", error);
+            }
+        };
+        
+        // マイクが初期化されていない場合のみ実行
+        if (!sessionStorage.getItem('microphoneInitialized')) {
+            // 少し遅延させて実行（ページの読み込みが完了した後）
+            setTimeout(requestMicrophoneAccess, 1000);
+        }
+    });
+    </script>
+    """
+    st.markdown(mic_init_js, unsafe_allow_html=True)
+
 # アプリケーションの設定と初期化
 APP_TITLE = "英会話学習サービス"
 DEFAULT_LESSON = "Lesson 29"
@@ -497,6 +536,9 @@ def generate_ai_response(user_input, conversation_history):
 # セッション状態の初期化
 initialize_session_state()
 session = st.session_state.session
+
+# マイクの初期化
+initialize_microphone()
 
 # メインタイトル
 st.title(f"{APP_TITLE} - {session.lesson_name} 復習")
