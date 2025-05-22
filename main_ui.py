@@ -268,6 +268,11 @@ def transcribe_audio(audio_bytes):
         show_error("OpenAI APIキーが設定されていません。")
         return None
     
+    # 音声ファイルのサイズが小さすぎる場合は処理しない（最小100バイト）
+    if len(audio_bytes) < 100:
+        show_warning(f"音声ファイルが短すぎます（{len(audio_bytes)}バイト）。マイクボタンを押して、話し終わってから再度ボタンを押してください。")
+        return None
+    
     try:
         # 一時ファイルに保存
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -444,14 +449,29 @@ def simple_audio_input(on_audio_complete):
     # 前回の音声データを追跡するためのセッション状態
     if "last_audio_data" not in st.session_state:
         st.session_state.last_audio_data = None
+        
+    # マイク使用方法のガイダンスを表示
+    st.markdown("""
+    <div style="background-color:#f0f2f6;padding:10px;border-radius:5px;margin-bottom:10px;">
+        <h4 style="margin-top:0;">📣 マイクの使い方</h4>
+        <ol style="margin-bottom:0;">
+            <li>マイクボタンを<strong>1回</strong>押して録音を開始</li>
+            <li>話し終わったら、再度マイクボタンを押して録音を停止</li>
+            <li>マイクボタンは<strong>必ず2回</strong>押してください（開始と停止）</li>
+        </ol>
+    </div>
+    """, unsafe_allow_html=True)
 
     # audio_recorder_streamlitパッケージのコンポーネントを使用
+    # エネルギー閾値と一時停止閾値を調整して信頼性を向上
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
-        icon_size="2x"
+        icon_size="2x",
+        energy_threshold=(-1.0, -1.0),  # 常に録音状態を維持する
+        pause_threshold=0.8  # 一時停止閾値を増やして短すぎる録音を防止
     )
     
     # 音声データがあり、前回処理した音声データと異なる場合のみ処理
@@ -459,6 +479,12 @@ def simple_audio_input(on_audio_complete):
         # 現在の音声データを保存
         st.session_state.last_audio_data = audio_bytes
         
+        # 音声データのサイズをチェック
+        if len(audio_bytes) < 100:
+            show_warning("録音時間が短すぎます。マイクボタンを押した後、話し終わるまで待ってから再度押してください。")
+            return
+            
+        # 音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
         with st.spinner("音声を認識中..."):
@@ -724,6 +750,18 @@ if mode == "ダイアログ練習モード":
             st.markdown("### あなたの番です")
             st.markdown(f"🎯 次のセリフを話してください: **{current_line['text']}**")
             
+            # マイク使用方法のガイダンスを表示
+            st.markdown("""
+            <div style="background-color:#f0f2f6;padding:10px;border-radius:5px;margin-bottom:10px;">
+                <h4 style="margin-top:0;">📣 マイクの使い方</h4>
+                <ol style="margin-bottom:0;">
+                    <li>マイクボタンを<strong>1回</strong>押して録音を開始</li>
+                    <li>話し終わったら、再度マイクボタンを押して録音を停止</li>
+                    <li>マイクボタンは<strong>必ず2回</strong>押してください（開始と停止）</li>
+                </ol>
+            </div>
+            """, unsafe_allow_html=True)
+            
             # 音声録音処理
             def on_dialog_audio_complete(text):
                 if text and text.strip():
@@ -739,7 +777,9 @@ if mode == "ダイアログ練習モード":
                 recording_color="#e74c3c",
                 neutral_color="#3498db",
                 icon_name="microphone",
-                icon_size="2x"
+                icon_size="2x",
+                energy_threshold=(-1.0, -1.0),  # 常に録音状態を維持する
+                pause_threshold=0.8  # 一時停止閾値を増やして短すぎる録音を防止
             )
             
             # 音声データがあり、前回処理した音声データと異なる場合のみ処理
@@ -747,17 +787,22 @@ if mode == "ダイアログ練習モード":
                 # 現在の音声データを保存
                 st.session_state.last_dialog_audio_data = audio_bytes
                 
-                st.audio(audio_bytes, format="audio/wav")
-                
-                with st.spinner("音声を認識中..."):
-                    # Whisper APIで音声認識
-                    transcription = transcribe_audio(audio_bytes)
+                # 音声データのサイズをチェック
+                if len(audio_bytes) < 100:
+                    show_warning("録音時間が短すぎます。マイクボタンを押した後、話し終わるまで待ってから再度押してください。")
+                else:
+                    # 音声を再生
+                    st.audio(audio_bytes, format="audio/wav")
                     
-                    if transcription:
-                        show_success(f"音声認識結果: {transcription}")
-                        on_dialog_audio_complete(transcription)
-                    else:
-                        show_error("音声認識に失敗しました。もう一度お試しください。")
+                    with st.spinner("音声を認識中..."):
+                        # Whisper APIで音声認識
+                        transcription = transcribe_audio(audio_bytes)
+                        
+                        if transcription:
+                            show_success(f"音声認識結果: {transcription}")
+                            on_dialog_audio_complete(transcription)
+                        else:
+                            show_error("音声認識に失敗しました。もう一度お試しください。")
     
     # ダイアログ完了時
     else:
