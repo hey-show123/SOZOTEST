@@ -313,7 +313,11 @@ if mode == "通常会話モード":
             
             st.session_state.history.append(("AI（お客様）", ai_reply))
             # AI応答を音声で再生
-            speak_text(ai_reply)
+            try:
+                speak_text(ai_reply)
+                st.success("✅ AI応答を音声で再生しています。")
+            except Exception as e:
+                st.error(f"❌ 音声再生中にエラーが発生しました: {str(e)}")
             st.rerun()
     else:
         # 音声入力
@@ -339,12 +343,17 @@ if mode == "通常会話モード":
                 )
                 ai_reply = response.choices[0].message.content
                 st.success(f"AI（お客様）の返答: {ai_reply}")
+                st.session_state.history.append(("AI（お客様）", ai_reply))
+                # AI応答を音声で再生
+                try:
+                    speak_text(ai_reply)
+                    st.success("✅ AI応答を音声で再生しています。")
+                except Exception as e:
+                    st.error(f"❌ 音声再生中にエラーが発生しました: {str(e)}")
             except Exception as e:
                 st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
                 ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
-            st.session_state.history.append(("AI（お客様）", ai_reply))
-            # AI応答を音声で再生
-            speak_text(ai_reply)
+                st.session_state.history.append(("AI（お客様）", ai_reply))
         record_5sec_and_send(client, on_transcript)
 
 # --- ダイアログ練習モード ---
