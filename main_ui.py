@@ -69,6 +69,9 @@ def reset_conversation():
     if "session" in st.session_state:
         st.session_state.session.conversation_history = []
         st.session_state.message = ""
+        # 音声データのキャッシュもクリア
+        if "last_audio_data" in st.session_state:
+            st.session_state.last_audio_data = None
         show_success("会話履歴をリセットしました。")
 
 def reset_dialog():
@@ -79,6 +82,9 @@ def reset_dialog():
         st.session_state.waiting_for_input = False
         if "last_played_line" in st.session_state:
             st.session_state.last_played_line = -1
+        # ダイアログの音声データキャッシュもクリア
+        if "last_dialog_audio_data" in st.session_state:
+            st.session_state.last_dialog_audio_data = None
         show_success("ダイアログをリセットしました。")
 
 def update_lesson_settings(lesson_name, key_phrase, vocab_list, extra_note):
@@ -435,6 +441,10 @@ def simple_audio_input(on_audio_complete):
     Args:
         on_audio_complete (func): 音声認識完了時のコールバック関数
     """
+    # 前回の音声データを追跡するためのセッション状態
+    if "last_audio_data" not in st.session_state:
+        st.session_state.last_audio_data = None
+
     # audio_recorder_streamlitパッケージのコンポーネントを使用
     audio_bytes = audio_recorder(
         text="",
@@ -444,7 +454,11 @@ def simple_audio_input(on_audio_complete):
         icon_size="2x"
     )
     
-    if audio_bytes:
+    # 音声データがあり、前回処理した音声データと異なる場合のみ処理
+    if audio_bytes and audio_bytes != st.session_state.last_audio_data:
+        # 現在の音声データを保存
+        st.session_state.last_audio_data = audio_bytes
+        
         st.audio(audio_bytes, format="audio/wav")
         
         with st.spinner("音声を認識中..."):
@@ -662,6 +676,8 @@ if mode == "ダイアログ練習モード":
         st.session_state.waiting_for_input = False
     if "last_played_line" not in st.session_state:
         st.session_state.last_played_line = -1
+    if "last_dialog_audio_data" not in st.session_state:
+        st.session_state.last_dialog_audio_data = None
     
     dialog_lines = session.dialog_lines
     current_position = st.session_state.dialog_progress
@@ -717,8 +733,31 @@ if mode == "ダイアログ練習モード":
                     st.session_state.last_played_line = -1  # 音声再生状態をリセット
                     st.rerun()
             
-            # 新しい音声入力コンポーネントを使用
-            simple_audio_input(on_dialog_audio_complete)
+            # ダイアログモード用の音声入力コンポーネント
+            audio_bytes = audio_recorder(
+                text="",
+                recording_color="#e74c3c",
+                neutral_color="#3498db",
+                icon_name="microphone",
+                icon_size="2x"
+            )
+            
+            # 音声データがあり、前回処理した音声データと異なる場合のみ処理
+            if audio_bytes and audio_bytes != st.session_state.last_dialog_audio_data:
+                # 現在の音声データを保存
+                st.session_state.last_dialog_audio_data = audio_bytes
+                
+                st.audio(audio_bytes, format="audio/wav")
+                
+                with st.spinner("音声を認識中..."):
+                    # Whisper APIで音声認識
+                    transcription = transcribe_audio(audio_bytes)
+                    
+                    if transcription:
+                        show_success(f"音声認識結果: {transcription}")
+                        on_dialog_audio_complete(transcription)
+                    else:
+                        show_error("音声認識に失敗しました。もう一度お試しください。")
     
     # ダイアログ完了時
     else:
