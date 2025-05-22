@@ -278,19 +278,48 @@ if mode == "通常会話モード":
 - あなた（AI）は、髪の悩みや状態を自然に伝え、スタッフ（ユーザー）がキーフレーズや語彙を使わざるを得ない流れに誘導する
 - 会話の中でキーフレーズや語彙が自然に出てくるようにする
 - スタッフ（ユーザー）が講座のフレーズや語彙を使った場合は、さりげなく肯定的な反応や簡単なフィードバックを与える
-- 会話は短く、講座の復習に集中する
-- 難しい表現や脱線は避ける
+- 会話は自然な流れで継続する（1回の応答で終わらせない）
+- 難しい表現は避け、初級〜中級レベルの英語を使用する
+- お客様らしい自然な反応を心がける（例：髪の悩みを詳しく説明、提案されたケアに興味を示すなど）
+
+【会話の進め方】
+1. 最初は簡単な挨拶から始める
+2. 髪の悩みや要望を徐々に具体的に説明する
+3. スタッフの提案に対して興味を示し、詳しい説明を求める
+4. 会話を自然に展開させ、複数回のやり取りを行う
+5. 必要に応じて新しい話題（髪型、カラー、ヘアケアなど）に展開する
 
 【日本語補足】
-- 会話は英語で行い、必要に応じて簡単な日本語の補足説明を加えてもよい
+- 会話は英語で行い、必要に応じて簡単な日本語の補足説明を加える
+- 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
+
+【会話の例】
+Customer: "Hi, I'd like to get my hair done today."
+Staff: "Welcome! What would you like to do?"
+Customer: "Well, my hair feels really damaged... (髪の痛みを訴えることで、トリートメントの提案を引き出す機会を作ります)"
+Staff: "Would you like to do a treatment as well?"
+Customer: "Oh, what kind of treatment do you recommend? (トリートメントの種類について会話を展開させます)"
 
 あなたはこのルールに従い、復習会話の「お客様」役を演じてください。
+会話は自然に続くように心がけ、スタッフの返答に応じて適切に反応してください。
 """
 
     # 会話履歴表示
     st.subheader("会話履歴")
-    for speaker, text in st.session_state.history:
-        st.markdown(f"**{speaker}:** {text}")
+    for i, (speaker, text) in enumerate(st.session_state.history):
+        # スタッフとお客様で異なるスタイルを適用
+        if speaker == "あなた（スタッフ）":
+            st.markdown(f"""
+            <div style="background-color: #e3f2fd; padding: 10px; border-radius: 10px; margin: 5px 0;">
+                <strong>{speaker}:</strong> {text}
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background-color: #f5f5f5; padding: 10px; border-radius: 10px; margin: 5px 0;">
+                <strong>{speaker}:</strong> {text}
+            </div>
+            """, unsafe_allow_html=True)
 
     # 入力方法の選択
     input_method = st.radio("入力方法を選択", ["テキスト入力", "音声入力"])
