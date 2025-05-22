@@ -320,6 +320,10 @@ def simple_audio_input(on_audio_complete):
     ※録音中は赤いボタンが表示されます
     """)
     
+    # 前回処理した音声データの管理
+    if "last_processed_audio" not in st.session_state:
+        st.session_state.last_processed_audio = None
+    
     # audio_recorder_streamlitパッケージのコンポーネントを使用
     audio_bytes = audio_recorder(
         text="",
@@ -330,17 +334,27 @@ def simple_audio_input(on_audio_complete):
     )
     
     if audio_bytes:
-        st.audio(audio_bytes, format="audio/wav")
+        # 音声データのハッシュを計算して一意のIDとして使用
+        audio_hash = hash(audio_bytes)
         
-        with st.spinner("音声を認識中..."):
-            # Whisper APIで音声認識
-            transcription = transcribe_audio(audio_bytes)
+        # 前回と同じ音声データでないことを確認
+        if audio_hash != st.session_state.last_processed_audio:
+            st.audio(audio_bytes, format="audio/wav")
             
-            if transcription:
-                show_success(f"音声認識結果: {transcription}")
-                on_audio_complete(transcription)
-            else:
-                show_error("音声認識に失敗しました。もう一度お試しください。")
+            with st.spinner("音声を認識中..."):
+                # Whisper APIで音声認識
+                transcription = transcribe_audio(audio_bytes)
+                
+                if transcription:
+                    show_success(f"音声認識結果: {transcription}")
+                    # 処理した音声データのIDを保存
+                    st.session_state.last_processed_audio = audio_hash
+                    # コールバック関数を呼び出し
+                    on_audio_complete(transcription)
+                else:
+                    show_error("音声認識に失敗しました。もう一度お試しください。")
+                    # エラーの場合も前回の音声IDを更新
+                    st.session_state.last_processed_audio = audio_hash
 
 # テキスト入力処理の修正
 def handle_text_input():
