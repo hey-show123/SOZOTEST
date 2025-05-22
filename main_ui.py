@@ -16,9 +16,12 @@ from openai import OpenAI
 import io
 import numpy as np
 from datetime import datetime
+import av
+import threading
 
 # 音声録音用コンポーネント
 from audio_recorder_streamlit import audio_recorder
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 # .envからAPIキーを読み込む
 load_dotenv()
@@ -56,6 +59,7 @@ class SessionState:
         self.dialog_lines = default_dialog()
         self.recording = False
         self.audio_data = None
+        self.mic_authorized = False  # マイク認証状態を追加
 
 def initialize_session_state():
     """セッション状態の初期化"""
@@ -307,67 +311,41 @@ def transcribe_audio(audio_bytes):
 def simple_audio_input(on_audio_complete, key_suffix=""):
     """
     Streamlitの音声録音コンポーネントを使用した簡易音声入力
-    マイク許可と録音を分離したUIを提供
     
     Args:
         on_audio_complete (func): 音声認識完了時のコールバック関数
         key_suffix (str): コンポーネントのキーに追加するサフィックス
     """
-    # セッション状態の初期化
-    if f"is_recording_{key_suffix}" not in st.session_state:
-        st.session_state[f"is_recording_{key_suffix}"] = False
+    # マイク認証状態を確認
+    if not st.session_state.session.mic_authorized:
+        st.warning("マイクの認証が必要です。上部のマイク認証セクションでマイクを許可してください。")
+        return False
     
+    st.info("""
+    ### 音声入力の使い方
+    1. 「録音」ボタンをクリックして録音を開始します
+    2. 話し終わったら再度ボタンをクリックして録音を停止します
+    3. 自動的に音声認識が行われます
+    
+    ※録音中は赤いボタンが表示されます
+    """)
+    
+    # セッション状態の初期化
     if f"audio_bytes_{key_suffix}" not in st.session_state:
         st.session_state[f"audio_bytes_{key_suffix}"] = None
     
-    # マイク許可と録音ボタンを分離したUI
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        # マイク許可ボタン
-        st.button(
-            "マイク許可を確認 🎤",
-            help="クリックするとマイクへのアクセス許可を確認します。録音は開始されません。",
-            key=f"mic_check_{key_suffix}"
-        )
-    
-    with col2:
-        # 録音ボタン
-        recording_state = st.session_state[f"is_recording_{key_suffix}"]
-        button_label = "録音停止 ⏹" if recording_state else "録音開始 ⏺"
-        button_color = "#e74c3c" if recording_state else "#3498db"
-        
-        # 録音状態をトグルするボタン
-        if st.button(
-            button_label,
-            key=f"record_button_{key_suffix}",
-            help="クリックして録音を開始/停止します"
-        ):
-            st.session_state[f"is_recording_{key_suffix}"] = not recording_state
-            st.rerun()
-    
-    # 録音状態の表示
-    if st.session_state[f"is_recording_{key_suffix}"]:
-        st.warning("⏺ 録音中... 話し終わったら「録音停止」をクリックしてください")
-    else:
-        st.info("🎤 「録音開始」をクリックして話してください")
-    
-    # 実際の音声録音コンポーネント（非表示モード）
+    # 音声録音コンポーネントの表示（セッション間で状態を保持するためにキーを使用）
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
-        icon_size="0x",  # サイズを0にして非表示に
-        key=f"audio_recorder_{key_suffix}",
-        recording=st.session_state[f"is_recording_{key_suffix}"]
+        icon_size="2x",
+        key=f"audio_recorder_{key_suffix}"
     )
     
     # 音声データがある場合は処理
     if audio_bytes:
-        # 録音停止
-        st.session_state[f"is_recording_{key_suffix}"] = False
-        
         # ユーザーに音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
@@ -387,6 +365,8 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
                     on_audio_complete(transcription)
                 else:
                     show_error("音声認識に失敗しました。もう一度お試しください。")
+    
+    return True
 
 # テキスト入力処理の修正
 def handle_text_input():
@@ -576,8 +556,59 @@ with st.sidebar:
     if st.button("会話履歴をクリア"):
         reset_conversation()
 
+# マイク認証用コンポーネント
+def authorize_microphone():
+    """マイク認証用のコンポーネントを表示する関数"""
+    st.subheader("🎤 マイク認証")
+    st.info("""
+    このセクションでは、マイクへのアクセスを許可します。
+    「START」ボタンをクリックしてマイクへのアクセスを許可してください。
+    許可後は「STOP」を押して、このコンポーネントを閉じることができます。
+    """)
+    
+    # WebRTCコンポーネントの表示（音声のみのストリーミング）
+    def video_frame_callback(frame):
+        # 何もしない（マイク認証のみ）
+        return frame
+    
+    def audio_frame_callback(frame):
+        # マイク認証状態を更新
+        if not st.session_state.session.mic_authorized:
+            st.session_state.session.mic_authorized = True
+            # 更新を通知
+            st.info("マイクの認証に成功しました！録音ボタンを使って会話を開始できます。")
+        return frame
+    
+    # 音声のみを扱うWebRTCコンポーネント
+    ctx = webrtc_streamer(
+        key="microphone-auth",
+        mode=WebRtcMode.SENDRECV,
+        audio_processor_factory=lambda: AudioProcessor(audio_frame_callback),
+        video_processor_factory=None,  # ビデオなし
+        media_stream_constraints={"video": False, "audio": True},
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    )
+    
+    # マイク認証状態を表示
+    if st.session_state.session.mic_authorized:
+        st.success("✅ マイクの認証は完了しています。録音ボタンを使って会話を開始できます。")
+    
+    return st.session_state.session.mic_authorized
+
+# 音声処理用のクラス
+class AudioProcessor:
+    def __init__(self, callback):
+        self.callback = callback
+    
+    def recv(self, frame):
+        return self.callback(frame)
+
 # 通常会話モードの処理
 if mode == "通常会話モード":
+    # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
+    with st.expander("🎤 マイク認証", expanded=not st.session_state.session.mic_authorized):
+        authorize_microphone()
+    
     # プロンプトの自動生成
     system_prompt = generate_system_prompt()
     
@@ -716,6 +747,10 @@ if mode == "通常会話モード":
 
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
+    # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
+    with st.expander("🎤 マイク認証", expanded=not st.session_state.session.mic_authorized):
+        authorize_microphone()
+    
     st.subheader("ダイアログ練習モード")
     show_info("実際の会話のように、音声で練習できます。あなたの番になったら、録音ボタンを押して話してください。")
     
