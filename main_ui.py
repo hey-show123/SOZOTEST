@@ -323,28 +323,122 @@ def render_input_method_selector():
     """入力方法の選択UIをレンダリング"""
     col1, col2 = st.columns([1, 4])
     with col1:
-        input_method = st.radio("入力方法", ["💬 テキスト", "🎤 音声", "🎤 簡易録音(Beta)"])
+        input_method = st.radio("入力方法", ["💬 テキスト", "🎤 音声"])
     with col2:
         if input_method == "💬 テキスト":
             show_info("テキストを入力して送信ボタンを押してください")
-        elif input_method == "🎤 音声":
+        else:
             show_info("""録音ボタンを押して話しかけてください（5秒間）
             
 接続に問題がある場合:
 1. ブラウザがマイクへのアクセスを許可しているか確認
 2. 別のブラウザ(ChromeやFirefox)を試す
 3. ネットワーク接続を確認
-4. VPNを使用している場合は無効化してみる
-5. 「簡易録音(Beta)」モードを試してみる""")
-        else:
-            show_info("「録音開始」を押してから話し、「録音停止」を押して送信します。WebRTC接続の問題を回避できる可能性があります。")
+4. VPNを使用している場合は無効化してみる""")
+    return input_method == "🎤 音声"
+
+# --- 5秒自動録音UI ---
+def record_5sec_and_send(client, on_transcript):
+    audio_state = st.session_state.audio_state
     
-    if input_method == "🎤 音声":
-        return 1  # WebRTC音声
-    elif input_method == "🎤 簡易録音(Beta)":
-        return 2  # 簡易録音
-    else:
-        return 0  # テキスト
+    # 録音ボタンのUI
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🎤 録音開始", disabled=audio_state.is_recording, key="record_button"):
+            audio_state.is_recording = True
+            audio_state.status = "recording"
+            audio_state.recording_start_time = time.time()
+            audio_state.error_message = None
+            st.rerun()  # ボタン押下後すぐに再描画
+    with col2:
+        show_recording_status()
+
+    if audio_state.is_recording:
+        # WebRTC用のRTCConfiguration設定
+        rtc_configuration = {
+            "iceServers": [
+                {"urls": ["stun:stun.l.google.com:19302"]},
+                {"urls": ["stun:stun1.l.google.com:19302"]},
+                {"urls": ["stun:stun2.l.google.com:19302"]},
+            ]
+        }
+        
+        # WebRTC接続の状態表示
+        with st.expander("WebRTC接続の詳細 (問題が発生した場合に開いてください)", expanded=False):
+            st.info("""
+            WebRTC接続の状態は、ブラウザのコンソールで確認できます。
+            接続に問題がある場合:
+            - ブラウザのコンソールを開き（F12キー）、エラーメッセージを確認
+            - 別のブラウザや別のネットワーク環境を試す
+            - Streamlitサーバーを再起動する
+            """)
+        
+        webrtc_ctx = webrtc_streamer(
+            key="audio-recorder",
+            mode=WebRtcMode.SENDONLY,
+            audio_receiver_size=1024,
+            media_stream_constraints={"audio": True, "video": False},
+            audio_processor_factory=Recorder,
+            async_processing=True,
+            rtc_configuration=rtc_configuration,  # STUNサーバー設定を追加
+        )
+
+        if webrtc_ctx.audio_processor:
+            try:
+                # 録音の進行状況を更新
+                elapsed = time.time() - audio_state.recording_start_time if audio_state.recording_start_time else 0
+                audio_state.recording_duration = elapsed
+                
+                # 録音完了の判定
+                if elapsed >= CHUNK_DURATION:
+                    audio_state.status = "processing"
+                    frames = webrtc_ctx.audio_processor.frames
+                    
+                    if frames:
+                        # 音声ファイルの作成と保存
+                        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                            try:
+                                for frame in frames:
+                                    f.write(frame.to_ndarray().tobytes())
+                                audio_file = f.name
+                                
+                                # Whisper APIに送信
+                                if client:
+                                    with open(audio_file, "rb") as audio:
+                                        try:
+                                            transcript = client.audio.transcriptions.create(
+                                                model="whisper-1",
+                                                file=audio
+                                            )
+                                            recognized_text = transcript.text
+                                            
+                                            if not recognized_text or recognized_text.strip() == "":
+                                                show_warning("音声が認識できませんでした。もう一度録音してください。")
+                                            else:
+                                                show_success(f"音声認識完了！")
+                                                on_transcript(recognized_text)
+                                        except Exception as e:
+                                            show_error(f"音声認識中にエラーが発生しました: {str(e)}")
+                            except Exception as e:
+                                show_error(f"音声ファイルの処理中にエラーが発生しました: {str(e)}")
+                            finally:
+                                try:
+                                    os.unlink(audio_file)
+                                except Exception as e:
+                                    show_warning(f"一時ファイルの削除中にエラーが発生しました: {str(e)}")
+                    
+                    # 録音状態のリセット
+                    audio_state.is_recording = False
+                    audio_state.status = "ready"
+                    audio_state.recording_start_time = None
+                    audio_state.recording_duration = 0
+                    st.rerun()
+                
+            except Exception as e:
+                show_error(f"録音処理中にエラーが発生しました: {str(e)}")
+                audio_state.status = "error"
+                audio_state.error_message = str(e)
+                audio_state.is_recording = False
 
 # セッション状態の初期化
 initialize_session_state()
@@ -635,12 +729,12 @@ if mode == "通常会話モード":
     st.markdown('</div>', unsafe_allow_html=True)
     
     # 入力方法の選択
-    input_method = render_input_method_selector()
+    is_voice_input = render_input_method_selector()
     
-    if input_method == 0:  # テキスト入力
+    if not is_voice_input:
         # テキスト入力処理
         handle_text_input()
-    elif input_method == 1:  # WebRTC音声
+    else:
         # 音声入力処理
         def on_transcript(text):
             if text and text.strip():
@@ -657,23 +751,6 @@ if mode == "通常会話モード":
                     show_error("AI応答の生成に失敗しました。もう一度お試しください。")
         
         record_5sec_and_send(client, on_transcript)
-    else:  # 簡易録音
-        # 簡易録音処理
-        def on_transcript(text):
-            if text and text.strip():
-                # ユーザーの発言を会話履歴に追加
-                st.session_state.session.conversation_history.append(("あなた（スタッフ）", text))
-                
-                # AI応答を生成
-                ai_reply = generate_ai_response(text, st.session_state.session.conversation_history[:-1])
-                if ai_reply:
-                    # AIの応答を会話履歴に追加
-                    st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
-                    st.rerun()
-                else:
-                    show_error("AI応答の生成に失敗しました。もう一度お試しください。")
-        
-        simple_audio_recorder(client, on_transcript)
 
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
@@ -733,20 +810,100 @@ if mode == "ダイアログ練習モード":
             st.markdown("### あなたの番です")
             st.markdown(f"🎯 次のセリフを話してください: **{current_line['text']}**")
             
-            def on_dialog_transcript(text):
-                if not text or text.strip() == "":
-                    show_error("音声が認識できませんでした。もう一度録音してください。")
-                    return
-                
-                show_success(f"あなたの発話: {text}")
-                
-                # 次の行に進む
-                st.session_state.dialog_progress += 1
-                st.session_state.last_played_line = -1  # 音声再生状態をリセット
-                st.rerun()
+            # 音声録音機能を実装
+            audio_state = st.session_state.audio_state
             
-            # 音声録音機能を呼び出し
-            record_5sec_and_send(client, on_dialog_transcript)
+            # 録音ボタンのUI
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("🎤 録音開始", disabled=audio_state.is_recording, key="dialog_record_button"):
+                    audio_state.is_recording = True
+                    audio_state.status = "recording"
+                    audio_state.recording_start_time = time.time()
+                    audio_state.error_message = None
+                    st.rerun()
+            with col2:
+                show_recording_status()
+
+            if audio_state.is_recording:
+                # WebRTC用のRTCConfiguration設定
+                rtc_configuration = {
+                    "iceServers": [
+                        {"urls": ["stun:stun.l.google.com:19302"]},
+                        {"urls": ["stun:stun1.l.google.com:19302"]},
+                        {"urls": ["stun:stun2.l.google.com:19302"]},
+                    ]
+                }
+                
+                webrtc_ctx = webrtc_streamer(
+                    key="dialog-audio-recorder",
+                    mode=WebRtcMode.SENDONLY,
+                    audio_receiver_size=1024,
+                    media_stream_constraints={"audio": True, "video": False},
+                    audio_processor_factory=Recorder,
+                    async_processing=True,
+                    rtc_configuration=rtc_configuration,
+                )
+
+                if webrtc_ctx.audio_processor:
+                    try:
+                        # 録音の進行状況を更新
+                        elapsed = time.time() - audio_state.recording_start_time if audio_state.recording_start_time else 0
+                        audio_state.recording_duration = elapsed
+                        
+                        # 録音完了の判定
+                        if elapsed >= CHUNK_DURATION:
+                            audio_state.status = "processing"
+                            frames = webrtc_ctx.audio_processor.frames
+                            
+                            if frames:
+                                # 音声ファイルの作成と保存
+                                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                                    try:
+                                        for frame in frames:
+                                            f.write(frame.to_ndarray().tobytes())
+                                        audio_file = f.name
+                                        
+                                        # Whisper APIに送信
+                                        if client:
+                                            with open(audio_file, "rb") as audio:
+                                                try:
+                                                    transcript = client.audio.transcriptions.create(
+                                                        model="whisper-1",
+                                                        file=audio
+                                                    )
+                                                    recognized_text = transcript.text
+                                                    
+                                                    if not recognized_text or recognized_text.strip() == "":
+                                                        show_warning("音声が認識できませんでした。もう一度録音してください。")
+                                                    else:
+                                                        show_success(f"あなたの発話: {recognized_text}")
+                                                        
+                                                        # 次の行に進む
+                                                        st.session_state.dialog_progress += 1
+                                                        st.session_state.last_played_line = -1  # 音声再生状態をリセット
+                                                except Exception as e:
+                                                    show_error(f"音声認識中にエラーが発生しました: {str(e)}")
+                                    except Exception as e:
+                                        show_error(f"音声ファイルの処理中にエラーが発生しました: {str(e)}")
+                                    finally:
+                                        try:
+                                            os.unlink(audio_file)
+                                        except Exception as e:
+                                            show_warning(f"一時ファイルの削除中にエラーが発生しました: {str(e)}")
+                            
+                            # 録音状態のリセット
+                            audio_state.is_recording = False
+                            audio_state.status = "ready"
+                            audio_state.recording_start_time = None
+                            audio_state.recording_duration = 0
+                            st.rerun()
+                        
+                    except Exception as e:
+                        show_error(f"録音処理中にエラーが発生しました: {str(e)}")
+                        audio_state.status = "error"
+                        audio_state.error_message = str(e)
+                        audio_state.is_recording = False
     
     # ダイアログ完了時
     else:
@@ -763,266 +920,4 @@ if mode == "ダイアログ練習モード":
         if st.button("ダイアログをリセット", key="reset_dialog_button"):
             reset_dialog()
             st.session_state.last_played_line = -1
-            st.rerun()
-
-# --- 5秒自動録音UI ---
-def record_5sec_and_send(client, on_transcript):
-    audio_state = st.session_state.audio_state
-    
-    # 録音ボタンのUI
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("🎤 録音開始", disabled=audio_state.is_recording, key="record_button"):
-            audio_state.is_recording = True
-            audio_state.status = "recording"
-            audio_state.recording_start_time = time.time()
-            audio_state.error_message = None
-            st.rerun()  # ボタン押下後すぐに再描画
-    with col2:
-        show_recording_status()
-
-    if audio_state.is_recording:
-        # WebRTC用のRTCConfiguration設定
-        rtc_configuration = {
-            "iceServers": [
-                {"urls": ["stun:stun.l.google.com:19302"]},
-                {"urls": ["stun:stun1.l.google.com:19302"]},
-                {"urls": ["stun:stun2.l.google.com:19302"]},
-                # 公開TURNサーバーを追加
-                {
-                    "urls": ["turn:openrelay.metered.ca:80"],
-                    "username": "openrelayproject",
-                    "credential": "openrelayproject"
-                },
-                {
-                    "urls": ["turn:openrelay.metered.ca:443"],
-                    "username": "openrelayproject",
-                    "credential": "openrelayproject"
-                },
-                {
-                    "urls": ["turn:openrelay.metered.ca:443?transport=tcp"],
-                    "username": "openrelayproject",
-                    "credential": "openrelayproject"
-                }
-            ],
-            "iceTransportPolicy": "all",
-            "sdpSemantics": "unified-plan"
-        }
-        
-        # WebRTC接続の状態表示
-        with st.expander("WebRTC接続の詳細 (問題が発生した場合に開いてください)", expanded=False):
-            st.info("""
-            WebRTC接続の状態は、ブラウザのコンソールで確認できます。
-            接続に問題がある場合:
-            - ブラウザのコンソールを開き（F12キー）、エラーメッセージを確認
-            - 別のブラウザや別のネットワーク環境を試す
-            - Streamlitサーバーを再起動する
-            - 「簡易録音(Beta)」モードを使用する
-            """)
-        
-        webrtc_ctx = webrtc_streamer(
-            key="audio-recorder",
-            mode=WebRtcMode.SENDONLY,
-            audio_receiver_size=1024,
-            media_stream_constraints={"audio": True, "video": False},
-            audio_processor_factory=Recorder,
-            async_processing=True,
-            rtc_configuration=rtc_configuration,  # STUNサーバー設定を追加
-        )
-
-        if webrtc_ctx.audio_processor:
-            try:
-                # 録音の進行状況を更新
-                elapsed = time.time() - audio_state.recording_start_time if audio_state.recording_start_time else 0
-                audio_state.recording_duration = elapsed
-                
-                # 録音完了の判定
-                if elapsed >= CHUNK_DURATION:
-                    audio_state.status = "processing"
-                    frames = webrtc_ctx.audio_processor.frames
-                    
-                    if frames:
-                        # 音声ファイルの作成と保存
-                        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                            try:
-                                for frame in frames:
-                                    f.write(frame.to_ndarray().tobytes())
-                                audio_file = f.name
-                                
-                                # Whisper APIに送信
-                                if client:
-                                    with open(audio_file, "rb") as audio:
-                                        try:
-                                            transcript = client.audio.transcriptions.create(
-                                                model="whisper-1",
-                                                file=audio
-                                            )
-                                            recognized_text = transcript.text
-                                            
-                                            if not recognized_text or recognized_text.strip() == "":
-                                                show_warning("音声が認識できませんでした。もう一度録音してください。")
-                                            else:
-                                                show_success(f"音声認識完了！")
-                                                on_transcript(recognized_text)
-                                        except Exception as e:
-                                            show_error(f"音声認識中にエラーが発生しました: {str(e)}")
-                            except Exception as e:
-                                show_error(f"音声ファイルの処理中にエラーが発生しました: {str(e)}")
-                            finally:
-                                try:
-                                    os.unlink(audio_file)
-                                except Exception as e:
-                                    show_warning(f"一時ファイルの削除中にエラーが発生しました: {str(e)}")
-                    
-                    # 録音状態のリセット
-                    audio_state.is_recording = False
-                    audio_state.status = "ready"
-                    audio_state.recording_start_time = None
-                    audio_state.recording_duration = 0
-                    st.rerun()
-                
-            except Exception as e:
-                show_error(f"録音処理中にエラーが発生しました: {str(e)}")
-                audio_state.status = "error"
-                audio_state.error_message = str(e)
-                audio_state.is_recording = False
-
-# 簡易録音機能の実装
-def simple_audio_recorder(client, on_transcript):
-    """WebRTCを使わない簡易的な録音機能"""
-    
-    # 録音状態の管理
-    if "simple_recording" not in st.session_state:
-        st.session_state.simple_recording = False
-    if "recorded_audio" not in st.session_state:
-        st.session_state.recorded_audio = None
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔴 録音開始", key="simple_record_start", disabled=st.session_state.simple_recording):
-            st.session_state.simple_recording = True
-            st.rerun()
-    with col2:
-        if st.button("⏹️ 録音停止・送信", key="simple_record_stop", disabled=not st.session_state.simple_recording):
-            st.session_state.simple_recording = False
-            st.rerun()
-    
-    if st.session_state.simple_recording:
-        # マイクからの入力をブラウザで録音（HTML/JavaScript）
-        st.markdown("""
-        <div style="padding: 10px; background-color: #f0f2f6; border-radius: 10px; margin-bottom: 10px;">
-            <div id="recording-status" style="color: red; font-weight: bold;">録音中...</div>
-            <audio id="audio-recorder" style="display: none;"></audio>
-            <script>
-                let audioChunks = [];
-                
-                async function setupRecorder() {
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        const mediaRecorder = new MediaRecorder(stream);
-                        
-                        mediaRecorder.ondataavailable = function(e) {
-                            if (e.data.size > 0) {
-                                audioChunks.push(e.data);
-                            }
-                        };
-                        
-                        mediaRecorder.onstop = function() {
-                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                            const audioUrl = URL.createObjectURL(audioBlob);
-                            const audio = document.getElementById('audio-recorder');
-                            audio.src = audioUrl;
-                            audio.style.display = 'block';
-                            
-                            // コールバック関数を呼び出す
-                            const reader = new FileReader();
-                            reader.readAsDataURL(audioBlob);
-                            reader.onloadend = function() {
-                                const base64data = reader.result;
-                                // Streamlitコンポーネントにデータを渡す
-                                if (window.parent) {
-                                    window.parent.postMessage({
-                                        type: "streamlit:setComponentValue",
-                                        value: base64data
-                                    }, "*");
-                                }
-                            }
-                        };
-                        
-                        mediaRecorder.start();
-                        
-                        // Streamlitの再レンダリングを検出してレコーダーを停止
-                        const observer = new MutationObserver((mutations) => {
-                            for (const mutation of mutations) {
-                                if (mutation.type === 'childList' && !document.getElementById('recording-status')) {
-                                    mediaRecorder.stop();
-                                    observer.disconnect();
-                                    break;
-                                }
-                            }
-                        });
-                        
-                        observer.observe(document.body, { childList: true, subtree: true });
-                        
-                        // グローバル変数に保存
-                        window.streamlitMediaRecorder = mediaRecorder;
-                    } catch (err) {
-                        console.error("録音の初期化に失敗しました:", err);
-                        document.getElementById('recording-status').innerText = "録音の初期化に失敗しました: " + err.message;
-                    }
-                }
-                
-                // レコーダーのセットアップ
-                setupRecorder();
-            </script>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.write("🔴 録音中... 「録音停止・送信」ボタンを押すと送信されます")
-        
-        # 録音データを受け取るカスタムコンポーネント
-        audio_data = st.text_input("", key="audio_data_input", label_visibility="collapsed")
-        
-        if audio_data and audio_data.startswith("data:audio"):
-            # Base64エンコードされた音声データを保存
-            st.session_state.recorded_audio = audio_data
-            st.session_state.simple_recording = False
-            
-            # 音声データを一時ファイルに保存
-            try:
-                # data:audio/wav;base64,... から base64部分を抽出
-                base64_data = audio_data.split(',')[1]
-                audio_bytes = base64.b64decode(base64_data)
-                
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                    f.write(audio_bytes)
-                    audio_file = f.name
-                
-                # Whisper APIに送信
-                if client:
-                    with open(audio_file, "rb") as audio:
-                        try:
-                            transcript = client.audio.transcriptions.create(
-                                model="whisper-1",
-                                file=audio
-                            )
-                            recognized_text = transcript.text
-                            
-                            if not recognized_text or recognized_text.strip() == "":
-                                show_warning("音声が認識できませんでした。もう一度録音してください。")
-                            else:
-                                show_success(f"音声認識完了！")
-                                on_transcript(recognized_text)
-                        except Exception as e:
-                            show_error(f"音声認識中にエラーが発生しました: {str(e)}")
-                try:
-                    os.unlink(audio_file)
-                except Exception:
-                    pass
-            except Exception as e:
-                show_error(f"音声処理中にエラーが発生しました: {str(e)}")
-    
-    elif st.session_state.recorded_audio:
-        # 録音された音声の再生
-        st.audio(st.session_state.recorded_audio)
-        st.session_state.recorded_audio = None 
+            st.rerun() 
