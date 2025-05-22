@@ -29,6 +29,26 @@ DEFAULT_KEY_PHRASE = "Would you like to do a treatment as well?"
 DEFAULT_VOCAB_LIST = "haircut, treatment, damage, feels~, style, frizzy, straight perm"
 DEFAULT_EXTRA_NOTE = "サービスの提案（特にトリートメントの勧め）に集中してください。"
 
+# デフォルトのダイアログを定義
+def default_dialog():
+    """デフォルトのダイアログデータを返す"""
+    return [
+        {"role": "Staff", "text": "What would you like to do today?"},
+        {"role": "Customer", "text": "A haircut please, my hair feels damaged."},
+        {"role": "Staff", "text": "OK, would you like to do a treatment as well?"},
+        {"role": "Customer", "text": "Sure."},
+    ]
+
+class AudioState:
+    """音声録音の状態を管理するクラス"""
+    def __init__(self):
+        self.is_recording = False
+        self.recording_start_time = None
+        self.recording_duration = 0
+        self.audio_data = []
+        self.status = "ready"  # ready, recording, processing, error
+        self.error_message = None
+
 class SessionState:
     """セッション状態を管理するクラス"""
     def __init__(self):
@@ -249,15 +269,6 @@ def speak_text(text):
 SAMPLE_RATE = 16000
 CHANNELS = 1
 CHUNK_DURATION = 5  # 5秒間の録音
-
-class AudioState:
-    def __init__(self):
-        self.is_recording = False
-        self.recording_start_time = None
-        self.recording_duration = 0
-        self.audio_data = []
-        self.status = "ready"  # ready, recording, processing, error
-        self.error_message = None
 
 if "audio_state" not in st.session_state:
     st.session_state.audio_state = AudioState()
