@@ -59,11 +59,10 @@ def speak_text(text):
             b64 = base64.b64encode(audio_bytes).decode()
             md_audio = f'''
             <div style="margin: 10px 0;">
-                <p style="margin-bottom: 5px;">🔊 音声を自動再生できない場合は、下のプレーヤーをクリックして再生してください：</p>
-                <audio controls autoplay src="data:audio/mp3;base64,{b64}">
+                <p style="margin-bottom: 5px;">🔊 下のプレーヤーをクリックして音声を再生してください：</p>
+                <audio controls src="data:audio/mp3;base64,{b64}">
                     お使いのブラウザは音声再生をサポートしていません。
                 </audio>
-                <p style="margin-top: 5px; font-size: 0.8em; color: #666;">※ブラウザの設定によっては自動再生が制限される場合があります。</p>
             </div>
             '''
             st.markdown(md_audio, unsafe_allow_html=True)
@@ -300,7 +299,7 @@ if mode == "通常会話モード":
             if client:
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4",
+                        model="gpt-3.5-turbo-0125",
                         messages=[
                             {"role": "system", "content": system_prompt},
                             *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
@@ -342,7 +341,7 @@ if mode == "通常会話モード":
             try:
                 st.info("AI応答生成中...")
                 response = client.chat.completions.create(
-                    model="gpt-4",
+                    model="gpt-3.5-turbo-0125",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
