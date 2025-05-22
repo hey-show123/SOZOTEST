@@ -303,36 +303,6 @@ def transcribe_audio(audio_bytes):
     
     return None
 
-# 簡易音声録音入力
-def simple_audio_input(on_audio_complete):
-    """
-    Streamlitの音声録音コンポーネントを使用した簡易音声入力
-    
-    Args:
-        on_audio_complete (func): 音声認識完了時のコールバック関数
-    """
-    # audio_recorder_streamlitパッケージのコンポーネントを使用
-    audio_bytes = audio_recorder(
-        text="",
-        recording_color="#e74c3c",
-        neutral_color="#3498db",
-        icon_name="microphone",
-        icon_size="2x"
-    )
-    
-    if audio_bytes:
-        st.audio(audio_bytes, format="audio/wav")
-        
-        with st.spinner("音声を認識中..."):
-            # Whisper APIで音声認識
-            transcription = transcribe_audio(audio_bytes)
-            
-            if transcription:
-                show_success(f"音声認識結果: {transcription}")
-                on_audio_complete(transcription)
-            else:
-                show_error("音声認識に失敗しました。もう一度お試しください。")
-
 # テキスト入力処理の修正
 def handle_text_input():
     """テキスト入力の処理を行う"""
@@ -384,6 +354,108 @@ def handle_text_input():
         st.session_state.message = ""
         st.session_state.send_pressed = False
         st.rerun()
+
+# システムプロンプトの生成
+def generate_system_prompt():
+    """現在の設定に基づいてシステムプロンプトを生成"""
+    return f"""
+あなたは英語を話す外国人のお客様です。
+これから美容院のスタッフ（ユーザー）と、英会話講座「{st.session_state.session.lesson_name}」の復習を行います。
+
+【講座テーマ・説明】
+- {st.session_state.session.extra_note}
+- 今日のフレーズ：「{st.session_state.session.key_phrase}」
+- 重要語彙：{st.session_state.session.vocab_list}
+
+【ルール】
+- 必ずこのレッスン内容に沿ったやりとりのみを行う
+- あなた（AI）は、髪の悩みや状態を自然に伝え、スタッフ（ユーザー）がキーフレーズや語彙を使わざるを得ない流れに誘導する
+- 会話の中でキーフレーズや語彙が自然に出てくるようにする
+- スタッフ（ユーザー）が講座のフレーズや語彙を使った場合は、さりげなく肯定的な反応や簡単なフィードバックを与える
+- 会話は自然な流れで継続する（1回の応答で終わらせない）
+- 難しい表現は避け、初級〜中級レベルの英語を使用する
+- お客様らしい自然な反応を心がける（例：髪の悩みを詳しく説明、提案されたケアに興味を示すなど）
+
+【会話の進め方】
+1. 最初は簡単な挨拶から始める
+2. 髪の悩みや要望を徐々に具体的に説明する
+3. スタッフの提案に対して興味を示し、詳しい説明を求める
+4. 会話を自然に展開させ、複数回のやり取りを行う
+5. 必要に応じて新しい話題（髪型、カラー、ヘアケアなど）に展開する
+
+【日本語補足】
+- 会話は英語で行い、必要に応じて簡単な日本語の補足説明を加える
+- 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
+"""
+
+# ChatGPT APIを使用してAI応答を生成する関数
+def generate_ai_response(user_input, conversation_history):
+    """
+    ユーザーの入力とこれまでの会話履歴を基にAI応答を生成する
+    
+    Args:
+        user_input (str): ユーザーの入力テキスト
+        conversation_history (list): これまでの会話履歴
+    
+    Returns:
+        str: 生成されたAI応答。エラー時はNone
+    """
+    if not client:
+        show_error("OpenAI APIキーが設定されていません。")
+        return None
+    
+    try:
+        # システムプロンプトを生成
+        system_prompt = generate_system_prompt()
+        
+        # ChatGPT APIを使用して応答を生成
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo-0125",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
+                   "content": text} 
+                  for speaker, text in conversation_history],
+                {"role": "user", "content": user_input}
+            ],
+            temperature=0.7,
+            max_tokens=150
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        show_error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
+        return None
+
+# 簡易音声録音入力
+def simple_audio_input(on_audio_complete):
+    """
+    Streamlitの音声録音コンポーネントを使用した簡易音声入力
+    
+    Args:
+        on_audio_complete (func): 音声認識完了時のコールバック関数
+    """
+    # audio_recorder_streamlitパッケージのコンポーネントを使用
+    audio_bytes = audio_recorder(
+        text="",
+        recording_color="#e74c3c",
+        neutral_color="#3498db",
+        icon_name="microphone",
+        icon_size="2x"
+    )
+    
+    if audio_bytes:
+        st.audio(audio_bytes, format="audio/wav")
+        
+        with st.spinner("音声を認識中..."):
+            # Whisper APIで音声認識
+            transcription = transcribe_audio(audio_bytes)
+            
+            if transcription:
+                show_success(f"音声認識結果: {transcription}")
+                on_audio_complete(transcription)
+            else:
+                show_error("音声認識に失敗しました。もう一度お試しください。")
 
 # セッション状態の初期化
 initialize_session_state()
@@ -663,76 +735,4 @@ if mode == "ダイアログ練習モード":
         if st.button("ダイアログをリセット", key="reset_dialog_button"):
             reset_dialog()
             st.session_state.last_played_line = -1
-            st.rerun()
-
-# システムプロンプトの生成
-def generate_system_prompt():
-    """現在の設定に基づいてシステムプロンプトを生成"""
-    return f"""
-あなたは英語を話す外国人のお客様です。
-これから美容院のスタッフ（ユーザー）と、英会話講座「{st.session_state.session.lesson_name}」の復習を行います。
-
-【講座テーマ・説明】
-- {st.session_state.session.extra_note}
-- 今日のフレーズ：「{st.session_state.session.key_phrase}」
-- 重要語彙：{st.session_state.session.vocab_list}
-
-【ルール】
-- 必ずこのレッスン内容に沿ったやりとりのみを行う
-- あなた（AI）は、髪の悩みや状態を自然に伝え、スタッフ（ユーザー）がキーフレーズや語彙を使わざるを得ない流れに誘導する
-- 会話の中でキーフレーズや語彙が自然に出てくるようにする
-- スタッフ（ユーザー）が講座のフレーズや語彙を使った場合は、さりげなく肯定的な反応や簡単なフィードバックを与える
-- 会話は自然な流れで継続する（1回の応答で終わらせない）
-- 難しい表現は避け、初級〜中級レベルの英語を使用する
-- お客様らしい自然な反応を心がける（例：髪の悩みを詳しく説明、提案されたケアに興味を示すなど）
-
-【会話の進め方】
-1. 最初は簡単な挨拶から始める
-2. 髪の悩みや要望を徐々に具体的に説明する
-3. スタッフの提案に対して興味を示し、詳しい説明を求める
-4. 会話を自然に展開させ、複数回のやり取りを行う
-5. 必要に応じて新しい話題（髪型、カラー、ヘアケアなど）に展開する
-
-【日本語補足】
-- 会話は英語で行い、必要に応じて簡単な日本語の補足説明を加える
-- 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
-"""
-
-# ChatGPT APIを使用してAI応答を生成する関数
-def generate_ai_response(user_input, conversation_history):
-    """
-    ユーザーの入力とこれまでの会話履歴を基にAI応答を生成する
-    
-    Args:
-        user_input (str): ユーザーの入力テキスト
-        conversation_history (list): これまでの会話履歴
-    
-    Returns:
-        str: 生成されたAI応答。エラー時はNone
-    """
-    if not client:
-        show_error("OpenAI APIキーが設定されていません。")
-        return None
-    
-    try:
-        # システムプロンプトを生成
-        system_prompt = generate_system_prompt()
-        
-        # ChatGPT APIを使用して応答を生成
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo-0125",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
-                   "content": text} 
-                  for speaker, text in conversation_history],
-                {"role": "user", "content": user_input}
-            ],
-            temperature=0.7,
-            max_tokens=150
-        )
-        
-        return response.choices[0].message.content
-    except Exception as e:
-        show_error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
-        return None 
+            st.rerun() 
