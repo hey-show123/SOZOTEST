@@ -1,0 +1,89 @@
+{
+  "user_id": "test_user",
+  "scenarios_completed": [
+    "beauty_salon_conversation"
+  ],
+  "vocabulary_progress": {
+    "order": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:24.118520"
+    },
+    "recommendation": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:31.333642"
+    },
+    "size": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:32.303634"
+    },
+    "menu": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:32.934237"
+    },
+    "proposal": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:33.468221"
+    },
+    "perspective": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:33.943917"
+    },
+    "agenda": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:34.414792"
+    },
+    "consensus": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:34.907300"
+    },
+    "reservation": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:35.749950"
+    },
+    "check-in": {
+      "correct_count": 1,
+      "total_count": 1,
+      "last_practice": "2025-05-21T21:06:36.639063"
+    }
+  },
+  "grammar_progress": {},
+  "session_history": [
+    {
+      "date": "2025-05-21T21:06:00.376655",
+      "scenario_id": "beauty_salon_conversation",
+      "duration_minutes": 0,
+      "conversation_turns": 3,
+      "accuracy_rate": 0.8
+    }
+  ],
+  "strengths": [],
+  "weaknesses": [],
+  "level_assessment": {
+    "overall": "初級",
+    "speaking": "初級",
+    "listening": "初級",
+    "vocabulary": "初級",
+    "grammar": "初級"
+  },
+  "learning_stats": {
+    "total_sessions": 1,
+    "total_time_minutes": 0,
+    "total_conversation_turns": 3,
+    "vocab_learned": 10,
+    "last_session_date": "2025-05-21T21:06:00.376655"
+  },
+  "favorites": {
+    "scenarios": [],
+    "phrases": [],
+    "vocabulary": []
+  }
+}

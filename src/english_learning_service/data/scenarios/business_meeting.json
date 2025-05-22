@@ -1,0 +1,64 @@
+{
+  "scenario_id": "business_meeting",
+  "title": "ビジネス会議での発言",
+  "description": "会議での意見交換や提案を行うための表現",
+  "level": "中級",
+  "theme": "ビジネス",
+  "example_phrases": [
+    {
+      "en": "I'd like to share my thoughts on this matter.",
+      "ja": "この件について私の考えを共有したいと思います。"
+    },
+    {
+      "en": "Based on our data, I believe we should focus on...",
+      "ja": "データに基づくと、私たちは...に集中すべきだと考えます。"
+    },
+    {
+      "en": "Could you elaborate on that point?",
+      "ja": "その点についてもう少し詳しく説明していただけますか？"
+    },
+    {
+      "en": "I see your point, but I have a different perspective.",
+      "ja": "あなたの意見は理解できますが、私は異なる視点を持っています。"
+    }
+  ],
+  "key_vocabulary": [
+    {
+      "term": "proposal",
+      "definition": "提案",
+      "example": "I have a proposal for the new project."
+    },
+    {
+      "term": "perspective",
+      "definition": "視点、観点",
+      "example": "From my perspective, this approach has several advantages."
+    },
+    {
+      "term": "agenda",
+      "definition": "議題",
+      "example": "Let's move to the next item on our agenda."
+    },
+    {
+      "term": "consensus",
+      "definition": "合意",
+      "example": "We need to reach a consensus on this issue."
+    }
+  ],
+  "grammar_points": [
+    {
+      "point": "I believe that ~",
+      "explanation": "自分の意見を丁寧に述べる表現",
+      "example": "I believe that this strategy will yield better results."
+    },
+    {
+      "point": "Could you + verb",
+      "explanation": "丁寧な依頼表現",
+      "example": "Could you provide more details about the timeline?"
+    },
+    {
+      "point": "I see your point, but ~",
+      "explanation": "相手の意見を認めつつ異なる見解を示す表現",
+      "example": "I see your point, but we need to consider the costs as well."
+    }
+  ]
+}

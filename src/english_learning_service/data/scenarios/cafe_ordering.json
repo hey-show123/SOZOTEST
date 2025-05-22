@@ -1,0 +1,64 @@
+{
+  "scenario_id": "cafe_ordering",
+  "title": "カフェでの注文",
+  "description": "カフェで飲み物や軽食を注文する際の基本的な会話",
+  "level": "初級",
+  "theme": "日常会話",
+  "example_phrases": [
+    {
+      "en": "I'd like a cup of coffee, please.",
+      "ja": "コーヒーを一杯ください。"
+    },
+    {
+      "en": "Could I have a latte with soy milk?",
+      "ja": "豆乳ラテをお願いできますか？"
+    },
+    {
+      "en": "Do you have any recommendations?",
+      "ja": "何かおすすめはありますか？"
+    },
+    {
+      "en": "Is this to stay or to go?",
+      "ja": "こちらでお召し上がりですか、お持ち帰りですか？"
+    }
+  ],
+  "key_vocabulary": [
+    {
+      "term": "order",
+      "definition": "注文する",
+      "example": "I'd like to order a sandwich."
+    },
+    {
+      "term": "recommendation",
+      "definition": "おすすめ",
+      "example": "What's your recommendation?"
+    },
+    {
+      "term": "size",
+      "definition": "サイズ",
+      "example": "What size would you like?"
+    },
+    {
+      "term": "menu",
+      "definition": "メニュー",
+      "example": "Could I see the menu, please?"
+    }
+  ],
+  "grammar_points": [
+    {
+      "point": "I'd like ~ (I would like ~)",
+      "explanation": "丁寧な注文や要望を伝える表現",
+      "example": "I'd like a glass of water, please."
+    },
+    {
+      "point": "Could I have ~?",
+      "explanation": "丁寧な依頼表現",
+      "example": "Could I have the bill, please?"
+    },
+    {
+      "point": "Do you have ~?",
+      "explanation": "所有や提供の有無を尋ねる表現",
+      "example": "Do you have any vegetarian options?"
+    }
+  ]
+}

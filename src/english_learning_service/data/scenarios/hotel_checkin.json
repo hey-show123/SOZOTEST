@@ -1,0 +1,64 @@
+{
+  "scenario_id": "hotel_checkin",
+  "title": "ホテルでのチェックイン",
+  "description": "ホテルへのチェックインや部屋の問い合わせに関する会話",
+  "level": "初級",
+  "theme": "旅行",
+  "example_phrases": [
+    {
+      "en": "I have a reservation under the name Johnson.",
+      "ja": "ジョンソンという名前で予約しています。"
+    },
+    {
+      "en": "What time is check-out?",
+      "ja": "チェックアウトは何時ですか？"
+    },
+    {
+      "en": "Is breakfast included in the rate?",
+      "ja": "朝食は料金に含まれていますか？"
+    },
+    {
+      "en": "Do you have a room with a better view?",
+      "ja": "もっと景色の良い部屋はありますか？"
+    }
+  ],
+  "key_vocabulary": [
+    {
+      "term": "reservation",
+      "definition": "予約",
+      "example": "I made a reservation online."
+    },
+    {
+      "term": "check-in",
+      "definition": "チェックイン",
+      "example": "The check-in time is 3:00 PM."
+    },
+    {
+      "term": "amenities",
+      "definition": "アメニティ",
+      "example": "The room comes with all standard amenities."
+    },
+    {
+      "term": "concierge",
+      "definition": "コンシェルジュ",
+      "example": "You can ask the concierge for restaurant recommendations."
+    }
+  ],
+  "grammar_points": [
+    {
+      "point": "I have a ~ under the name",
+      "explanation": "予約の確認表現",
+      "example": "I have a booking under the name Smith."
+    },
+    {
+      "point": "Is ~ included in ~?",
+      "explanation": "包含関係を問う表現",
+      "example": "Is Wi-Fi included in the room rate?"
+    },
+    {
+      "point": "Do you have ~?",
+      "explanation": "所有や利用可能性を尋ねる表現",
+      "example": "Do you have a gym in this hotel?"
+    }
+  ]
+}
