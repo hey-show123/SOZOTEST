@@ -316,32 +316,11 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
         on_audio_complete (func): 音声認識完了時のコールバック関数
         key_suffix (str): コンポーネントのキーに追加するサフィックス
     """
-    # 音声データの保存キー
-    audio_bytes_key = f"audio_bytes_{key_suffix}"
-    processed_key = f"processed_{key_suffix}"
-    
-    # セッション状態の初期化
-    if audio_bytes_key not in st.session_state:
-        st.session_state[audio_bytes_key] = None
-    
-    if processed_key not in st.session_state:
-        st.session_state[processed_key] = False
-    
-    # マイク認証状態の確認
+    # マイク認証状態を確認
     if not st.session_state.session.mic_authorized:
-        # マイク認証が必要
-        st.warning("録音するには、まずマイクの認証が必要です。以下のボタンでマイクを認証してください。")
-        
-        # マイク認証ボタン
-        if st.button("🎤 マイクを認証する", key=f"auth_mic_{key_suffix}"):
-            st.session_state.session.mic_authorized = True
-            st.success("マイクの認証が完了しました！以下の録音ボタンを使って会話を開始できます。")
-            st.rerun()
-        
-        return False
-    
-    # マイク認証済みの場合は録音機能を表示
-    st.success("✅ マイクの認証は完了しています。以下の録音ボタンで録音を開始できます。")
+        st.warning("マイクの認証が完了していません。下の録音ボタンでマイク認証も兼ねて録音を開始できます。")
+    else:
+        st.success("マイクの認証は完了しています。下の録音ボタンで録音を開始できます。")
     
     st.info("""
     ### 音声入力の使い方
@@ -352,27 +331,54 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
     ※録音中は赤いボタンが表示されます
     """)
     
-    # 音声録音コンポーネントの表示（ユニークなキーを使用）
+    # セッション状態の初期化
+    if f"audio_bytes_{key_suffix}" not in st.session_state:
+        st.session_state[f"audio_bytes_{key_suffix}"] = None
+    
+    # 会話が更新されたら、新しいキーを生成して録音状態をリセット
+    unique_key = f"audio_recorder_{key_suffix}"
+    if "conversation_count" not in st.session_state:
+        st.session_state.conversation_count = 0
+    
+    # 会話履歴の長さを監視し、変化したらカウントを更新
+    conversation_len = len(st.session_state.session.conversation_history)
+    if "last_conversation_len" not in st.session_state:
+        st.session_state.last_conversation_len = conversation_len
+    elif st.session_state.last_conversation_len != conversation_len:
+        st.session_state.conversation_count += 1
+        st.session_state.last_conversation_len = conversation_len
+        # 古い音声データをクリア
+        st.session_state[f"audio_bytes_{key_suffix}"] = None
+    
+    # 会話カウントを含めた一意のキーを生成
+    unique_key = f"audio_recorder_{key_suffix}_{st.session_state.conversation_count}"
+    
+    # 音声録音コンポーネントの表示（会話ごとに異なるキーを使用）
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
         icon_size="2x",
-        key=f"audio_recorder_{key_suffix}_{int(time.time())}"  # タイムスタンプを追加して常に新しいコンポーネントを作成
+        key=unique_key
     )
     
     # 音声データがある場合は処理
     if audio_bytes:
+        # マイク認証状態を更新（録音できた = マイクは許可されている）
+        if not st.session_state.session.mic_authorized:
+            st.session_state.session.mic_authorized = True
+            st.success("マイクの認証が完了しました！")
+        
         # ユーザーに音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
-        # 前回と同じ音声データでなく、かつまだ処理されていない場合のみ処理
-        current_bytes = st.session_state.get(audio_bytes_key)
-        if (current_bytes != audio_bytes or not st.session_state[processed_key]) and len(audio_bytes) > 100:
-            # 処理中フラグを設定
-            st.session_state[processed_key] = True
-            st.session_state[audio_bytes_key] = audio_bytes
+        # セッション状態を更新（処理済みマーク）
+        current_bytes = st.session_state.get(f"audio_bytes_{key_suffix}")
+        
+        # 新しい録音データの場合のみ処理（同じデータの重複処理を防止）
+        if current_bytes != audio_bytes:
+            st.session_state[f"audio_bytes_{key_suffix}"] = audio_bytes
             
             with st.spinner("音声を認識中..."):
                 # Whisper APIで音声認識
@@ -380,17 +386,9 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
                 
                 if transcription:
                     show_success(f"音声認識結果: {transcription}")
-                    # コールバック関数を呼び出し
                     on_audio_complete(transcription)
-                    # 処理後にフラグをリセット（次回の録音のため）
-                    st.session_state[processed_key] = False
-                    st.session_state[audio_bytes_key] = None
                 else:
                     show_error("音声認識に失敗しました。もう一度お試しください。")
-                    # エラー時もフラグをリセット
-                    st.session_state[processed_key] = False
-        elif st.session_state[processed_key]:
-            st.info("音声処理中または処理済みです。新しい録音を行うには、再度録音ボタンを押してください。")
     
     return True
 
@@ -586,85 +584,64 @@ with st.sidebar:
 def authorize_microphone():
     """マイク認証用のコンポーネントを表示する関数"""
     st.subheader("🎤 マイク認証")
-    
-    # すでに認証済みの場合
-    if st.session_state.session.mic_authorized:
-        st.success("✅ マイクの認証は完了しています。録音ボタンを使って会話を開始できます。")
-        
-        # 認証のリセット機能
-        if st.button("マイク認証をリセット"):
-            st.session_state.session.mic_authorized = False
-            st.warning("マイク認証をリセットしました。再度認証が必要です。")
-            st.rerun()
-        
-        return True
-    
-    # 認証方法の説明
     st.info("""
-    ### マイク認証の方法
-    マイク認証には2つの方法があります：
+    このセクションでは、マイクへのアクセスを許可します。
+    「START」ボタンをクリックしてマイクへのアクセスを許可してください。
+    許可後は「STOP」を押して、このコンポーネントを閉じることができます。
     
-    1. 「WebRTC接続でマイク認証」: ブラウザの標準的なマイク認証方法（推奨）
-    2. 「手動でマイク認証」: WebRTC接続に問題がある場合に使用
-    
-    いずれかの方法でマイクを認証してください。
+    ※接続に問題がある場合は、下の「手動でマイク認証」ボタンを押してください。
     """)
     
-    # 認証方法の選択を2カラムで表示
-    col1, col2 = st.columns(2)
+    # WebRTCコンポーネントの表示（音声のみのストリーミング）
+    def video_frame_callback(frame):
+        # 何もしない（マイク認証のみ）
+        return frame
     
-    with col1:
-        if st.button("WebRTC接続でマイク認証", use_container_width=True):
-            # WebRTCの接続設定
-            try:
-                # WebRTCコンポーネントの表示（音声のみのストリーミング）
-                def audio_frame_callback(frame):
-                    # マイク認証状態を更新
-                    st.session_state.session.mic_authorized = True
-                    return frame
-                
-                # 複数のSTUNサーバーを設定
-                rtc_config = {
-                    "iceServers": [
-                        {"urls": ["stun:stun.l.google.com:19302"]},
-                        {"urls": ["stun:stun1.l.google.com:19302"]},
-                        {"urls": ["stun:stun2.l.google.com:19302"]},
-                        {"urls": ["stun:stun3.l.google.com:19302"]},
-                        {"urls": ["stun:stun4.l.google.com:19302"]},
-                        {"urls": ["stun:stun.ekiga.net"]}
-                    ],
-                    "iceTransportPolicy": "all"
-                }
-                
-                # 音声のみを扱うWebRTCコンポーネント
-                ctx = webrtc_streamer(
-                    key="microphone-auth-explicit",
-                    mode=WebRtcMode.SENDRECV,
-                    audio_processor_factory=lambda: AudioProcessor(audio_frame_callback),
-                    video_processor_factory=None,  # ビデオなし
-                    media_stream_constraints={"video": False, "audio": True},
-                    rtc_configuration=rtc_config,
-                    async_processing=True,
-                )
-                
-                if ctx.state.playing:
-                    st.info("マイクへのアクセスを許可してください...")
-                    
-                if st.session_state.session.mic_authorized:
-                    st.success("マイクの認証に成功しました！")
-                    st.rerun()
-            
-            except Exception as e:
-                st.error(f"WebRTC接続中にエラーが発生しました: {str(e)}")
-                st.warning("ネットワーク設定やブラウザの設定によって接続できない場合があります。代わりに手動認証を使用してください。")
-    
-    with col2:
-        # 代替のマイク認証方法（手動）
-        if st.button("手動でマイク認証", use_container_width=True):
+    def audio_frame_callback(frame):
+        # マイク認証状態を更新
+        if not st.session_state.session.mic_authorized:
             st.session_state.session.mic_authorized = True
-            st.success("マイクの認証を手動で完了しました。録音ボタンを使って会話を開始できます。")
-            st.warning("注意: ブラウザのマイク許可を求められた場合は、必ず許可してください。")
-            st.rerun()
+            # 更新を通知
+            st.success("マイクの認証に成功しました！録音ボタンを使って会話を開始できます。")
+        return frame
+    
+    # 複数のSTUNサーバーを設定
+    rtc_config = {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302"]},
+            {"urls": ["stun:stun3.l.google.com:19302"]},
+            {"urls": ["stun:stun4.l.google.com:19302"]},
+            {"urls": ["stun:stun.ekiga.net"]}
+        ],
+        "iceTransportPolicy": "all"
+    }
+    
+    # 音声のみを扱うWebRTCコンポーネント
+    try:
+        ctx = webrtc_streamer(
+            key="microphone-auth",
+            mode=WebRtcMode.SENDRECV,
+            audio_processor_factory=lambda: AudioProcessor(audio_frame_callback),
+            video_processor_factory=None,  # ビデオなし
+            media_stream_constraints={"video": False, "audio": True},
+            rtc_configuration=rtc_config,
+            async_processing=True,
+        )
+    except Exception as e:
+        st.error(f"WebRTC接続中にエラーが発生しました: {str(e)}")
+        st.warning("ネットワーク設定やブラウザの設定によって接続できない場合があります。")
+    
+    # 代替のマイク認証方法（手動）
+    if st.button("手動でマイク認証"):
+        st.session_state.session.mic_authorized = True
+        st.success("マイクの認証を手動で完了しました。録音ボタンを使って会話を開始できます。")
+        st.warning("注意: ブラウザのマイク許可を求められた場合は、必ず許可してください。")
+    
+    # マイク認証状態を表示
+    if st.session_state.session.mic_authorized:
+        st.success("✅ マイクの認証は完了しています。録音ボタンを使って会話を開始できます。")
     
     return st.session_state.session.mic_authorized
 
@@ -679,7 +656,7 @@ class AudioProcessor:
 # 通常会話モードの処理
 if mode == "通常会話モード":
     # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
-    with st.expander("🎤 マイク認証と設定", expanded=not st.session_state.session.mic_authorized):
+    with st.expander("🎤 マイク認証（接続に問題がある場合はクリック）", expanded=False):
         authorize_microphone()
     
     # プロンプトの自動生成
@@ -811,16 +788,8 @@ if mode == "通常会話モード":
                 if ai_reply:
                     # AIの応答を会話履歴に追加
                     st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
-                    
-                    # セッション状態をリセットして次の入力に備える
-                    audio_bytes_key = f"audio_bytes_conversation"
-                    processed_key = f"processed_conversation"
-                    if audio_bytes_key in st.session_state:
-                        st.session_state[audio_bytes_key] = None
-                    if processed_key in st.session_state:
-                        st.session_state[processed_key] = False
-                    
-                    # 画面を再描画
+                    # 状態を更新し、ページをリロード
+                    st.session_state.update_ui = True  # 新しいフラグを設定
                     st.rerun()
                 else:
                     show_error("AI応答の生成に失敗しました。もう一度お試しください。")
@@ -831,7 +800,7 @@ if mode == "通常会話モード":
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
     # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
-    with st.expander("🎤 マイク認証と設定", expanded=not st.session_state.session.mic_authorized):
+    with st.expander("🎤 マイク認証（接続に問題がある場合はクリック）", expanded=False):
         authorize_microphone()
     
     st.subheader("ダイアログ練習モード")
@@ -894,15 +863,6 @@ if mode == "ダイアログ練習モード":
             def on_dialog_audio_complete(text):
                 if text and text.strip():
                     show_success(f"あなたの発話: {text}")
-                    
-                    # セッション状態をリセットして次の入力に備える
-                    audio_bytes_key = f"audio_bytes_dialog"
-                    processed_key = f"processed_dialog"
-                    if audio_bytes_key in st.session_state:
-                        st.session_state[audio_bytes_key] = None
-                    if processed_key in st.session_state:
-                        st.session_state[processed_key] = False
-                    
                     # 次の行に進む
                     st.session_state.dialog_progress += 1
                     st.session_state.last_played_line = -1  # 音声再生状態をリセット
