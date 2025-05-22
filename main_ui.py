@@ -3,12 +3,12 @@ import os
 from dotenv import load_dotenv
 from io import BytesIO
 import numpy as np
-import sounddevice as sd
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 from openai import OpenAI
 import tempfile
 import wave
 import base64
+from st_audiorec import st_audiorec
 
 # .envからAPIキーを読み込む
 load_dotenv()
@@ -77,80 +77,14 @@ def print_audio_devices():
     except Exception as e:
         st.error(f"デバイス情報の取得中にエラーが発生: {str(e)}")
 
-def record_audio():
-    try:
-        # 利用可能なデバイス一覧を取得
-        devices = sd.query_devices()
-        input_devices = [i for i, d in enumerate(devices) if d.get('max_input_channels', 0) > 0]
-        
-        if not input_devices:
-            st.error("""
-            利用可能なマイク入力デバイスが見つかりません。以下をご確認ください：
-            
-            1. マイクの接続
-                - 内蔵マイクまたは外部マイクが正しく接続されているか
-                - 外部マイクの場合、一度抜き差しを試してみてください
-            
-            2. macOSの設定
-                - 「システム設定 > プライバシーとセキュリティ > マイク」で、Pythonまたはターミナルにマイク使用権限が付与されているか
-                - 権限がない場合は、付与してからアプリケーションを再起動してください
-            
-            3. デバイスの選択
-                - macOSの「システム設定 > サウンド > 入力」で、使用したいマイクが選択されているか
-                - 入力レベルが適切に設定されているか
-            
-            上記を確認の上、アプリケーションを再起動してください。
-            """)
-            return None
-            
-        # デバイス情報の表示
-        st.write("🎤 利用可能なマイク入力デバイス:")
-        for i in input_devices:
-            device_info = sd.query_devices(i)
-            st.write(f"- デバイス {i}: {device_info['name']}")
-        
-        # デフォルトデバイスの確認と選択
-        default_input = sd.default.device[0] if sd.default.device else None
-        if default_input not in input_devices:
-            device_id = input_devices[0]
-            st.warning(f"デフォルトの入力デバイスが利用できないため、デバイス {device_id} を使用します。")
-        else:
-            device_id = default_input
-            
-        # デバイス情報の表示
-        device_info = sd.query_devices(device_id)
-        st.info(f"使用するデバイス: {device_info['name']}")
-        
-        # 録音
-        recording = sd.rec(int(SAMPLE_RATE * CHUNK_DURATION),
-                          samplerate=SAMPLE_RATE,
-                          channels=CHANNELS,
-                          dtype=np.int16,
-                          device=device_id)
-        st.info("🎤 録音中... 5秒間お話しください")
-        sd.wait()
-        st.success("✅ 録音完了！")
-        
-        # WAVファイルとして保存
+def record_audio_web():
+    st.info("🎤 下のボタンで録音し、終わったらもう一度押してください")
+    audio_bytes = st_audiorec()
+    if audio_bytes is not None:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            with wave.open(f.name, 'wb') as wav:
-                wav.setnchannels(CHANNELS)
-                wav.setsampwidth(2)  # 16-bit
-                wav.setframerate(SAMPLE_RATE)
-                wav.writeframes(recording.tobytes())
+            f.write(audio_bytes)
             return f.name
-    except Exception as e:
-        st.error(f"""
-        マイク入力中にエラーが発生しました: {str(e)}
-        
-        以下をご確認ください：
-        1. マイクの接続状態
-        2. macOSの「システム設定 > プライバシーとセキュリティ > マイク」でのPython/ターミナルの権限設定
-        3. 「システム設定 > サウンド > 入力」でのマイク選択と入力レベル
-        
-        設定を変更した場合は、アプリケーションを再起動してください。
-        """)
-        return None
+    return None
 
 st.set_page_config(page_title="英会話学習サービス Lesson 29", layout="centered")
 st.title("英会話学習サービス - Lesson 29 復習")
@@ -331,7 +265,7 @@ if mode == "通常会話モード":
     else:
         # 音声入力
         if st.button("🎤 音声入力開始"):
-            audio_file = record_audio()
+            audio_file = record_audio_web()
             if audio_file and client:
                 with open(audio_file, "rb") as f:
                     # WhisperでSTT
@@ -416,7 +350,7 @@ if mode == "ダイアログ練習モード":
             
             # 音声入力ボタン
             if st.button("🎤 マイクで話す", key=f"mic_button_{current_position}"):
-                audio_file = record_audio()
+                audio_file = record_audio_web()
                 if audio_file and client:
                     with open(audio_file, "rb") as f:
                         # WhisperでSTT
