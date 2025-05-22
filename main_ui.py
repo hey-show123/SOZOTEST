@@ -16,12 +16,9 @@ from openai import OpenAI
 import io
 import numpy as np
 from datetime import datetime
-import av
-import threading
 
 # 音声録音用コンポーネント
 from audio_recorder_streamlit import audio_recorder
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 # .envからAPIキーを読み込む
 load_dotenv()
@@ -59,7 +56,6 @@ class SessionState:
         self.dialog_lines = default_dialog()
         self.recording = False
         self.audio_data = None
-        self.mic_authorized = False  # マイク認証状態を追加
 
 def initialize_session_state():
     """セッション状態の初期化"""
@@ -308,89 +304,34 @@ def transcribe_audio(audio_bytes):
     return None
 
 # 簡易音声録音入力
-def simple_audio_input(on_audio_complete, key_suffix=""):
+def simple_audio_input(on_audio_complete):
     """
     Streamlitの音声録音コンポーネントを使用した簡易音声入力
     
     Args:
         on_audio_complete (func): 音声認識完了時のコールバック関数
-        key_suffix (str): コンポーネントのキーに追加するサフィックス
     """
-    # マイク認証状態を確認
-    if not st.session_state.session.mic_authorized:
-        st.warning("マイクの認証が完了していません。下の録音ボタンでマイク認証も兼ねて録音を開始できます。")
-    else:
-        st.success("マイクの認証は完了しています。下の録音ボタンで録音を開始できます。")
-    
-    st.info("""
-    ### 音声入力の使い方
-    1. 「録音」ボタンをクリックして録音を開始します
-    2. 話し終わったら再度ボタンをクリックして録音を停止します
-    3. 自動的に音声認識が行われます
-    
-    ※録音中は赤いボタンが表示されます
-    """)
-    
-    # セッション状態の初期化
-    if f"audio_bytes_{key_suffix}" not in st.session_state:
-        st.session_state[f"audio_bytes_{key_suffix}"] = None
-    
-    # 会話が更新されたら、新しいキーを生成して録音状態をリセット
-    unique_key = f"audio_recorder_{key_suffix}"
-    if "conversation_count" not in st.session_state:
-        st.session_state.conversation_count = 0
-    
-    # 会話履歴の長さを監視し、変化したらカウントを更新
-    conversation_len = len(st.session_state.session.conversation_history)
-    if "last_conversation_len" not in st.session_state:
-        st.session_state.last_conversation_len = conversation_len
-    elif st.session_state.last_conversation_len != conversation_len:
-        st.session_state.conversation_count += 1
-        st.session_state.last_conversation_len = conversation_len
-        # 古い音声データをクリア
-        st.session_state[f"audio_bytes_{key_suffix}"] = None
-    
-    # 会話カウントを含めた一意のキーを生成
-    unique_key = f"audio_recorder_{key_suffix}_{st.session_state.conversation_count}"
-    
-    # 音声録音コンポーネントの表示（会話ごとに異なるキーを使用）
+    # audio_recorder_streamlitパッケージのコンポーネントを使用
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
-        icon_size="2x",
-        key=unique_key
+        icon_size="2x"
     )
     
-    # 音声データがある場合は処理
     if audio_bytes:
-        # マイク認証状態を更新（録音できた = マイクは許可されている）
-        if not st.session_state.session.mic_authorized:
-            st.session_state.session.mic_authorized = True
-            st.success("マイクの認証が完了しました！")
-        
-        # ユーザーに音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
-        # セッション状態を更新（処理済みマーク）
-        current_bytes = st.session_state.get(f"audio_bytes_{key_suffix}")
-        
-        # 新しい録音データの場合のみ処理（同じデータの重複処理を防止）
-        if current_bytes != audio_bytes:
-            st.session_state[f"audio_bytes_{key_suffix}"] = audio_bytes
+        with st.spinner("音声を認識中..."):
+            # Whisper APIで音声認識
+            transcription = transcribe_audio(audio_bytes)
             
-            with st.spinner("音声を認識中..."):
-                # Whisper APIで音声認識
-                transcription = transcribe_audio(audio_bytes)
-                
-                if transcription:
-                    show_success(f"音声認識結果: {transcription}")
-                    on_audio_complete(transcription)
-                else:
-                    show_error("音声認識に失敗しました。もう一度お試しください。")
-    
-    return True
+            if transcription:
+                show_success(f"音声認識結果: {transcription}")
+                on_audio_complete(transcription)
+            else:
+                show_error("音声認識に失敗しました。もう一度お試しください。")
 
 # テキスト入力処理の修正
 def handle_text_input():
@@ -444,91 +385,6 @@ def handle_text_input():
         st.session_state.send_pressed = False
         st.rerun()
 
-# 入力方法の選択UI
-def render_input_method_selector():
-    """入力方法の選択UIをレンダリング"""
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        input_method = st.radio("入力方法", ["💬 テキスト", "🎤 音声"])
-    with col2:
-        if input_method == "💬 テキスト":
-            show_info("テキストを入力して送信ボタンを押してください")
-        else:
-            show_info("「録音」ボタンを押して話し、もう一度ボタンを押して録音を完了します。")
-    return input_method == "🎤 音声"
-
-# システムプロンプトの生成
-def generate_system_prompt():
-    """現在の設定に基づいてシステムプロンプトを生成"""
-    return f"""
-あなたは英語を話す外国人のお客様です。
-これから美容院のスタッフ（ユーザー）と、英会話講座「{st.session_state.session.lesson_name}」の復習を行います。
-
-【講座テーマ・説明】
-- {st.session_state.session.extra_note}
-- 今日のフレーズ：「{st.session_state.session.key_phrase}」
-- 重要語彙：{st.session_state.session.vocab_list}
-
-【ルール】
-- 必ずこのレッスン内容に沿ったやりとりのみを行う
-- あなた（AI）は、髪の悩みや状態を自然に伝え、スタッフ（ユーザー）がキーフレーズや語彙を使わざるを得ない流れに誘導する
-- 会話の中でキーフレーズや語彙が自然に出てくるようにする
-- スタッフ（ユーザー）が講座のフレーズや語彙を使った場合は、さりげなく肯定的な反応や簡単なフィードバックを与える
-- 会話は自然な流れで継続する（1回の応答で終わらせない）
-- 難しい表現は避け、初級〜中級レベルの英語を使用する
-- お客様らしい自然な反応を心がける（例：髪の悩みを詳しく説明、提案されたケアに興味を示すなど）
-
-【会話の進め方】
-1. 最初は簡単な挨拶から始める
-2. 髪の悩みや要望を徐々に具体的に説明する
-3. スタッフの提案に対して興味を示し、詳しい説明を求める
-4. 会話を自然に展開させ、複数回のやり取りを行う
-5. 必要に応じて新しい話題（髪型、カラー、ヘアケアなど）に展開する
-
-【日本語補足】
-- 会話は英語で行い、必要に応じて簡単な日本語の補足説明を加える
-- 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
-"""
-
-# ChatGPT APIを使用してAI応答を生成する関数
-def generate_ai_response(user_input, conversation_history):
-    """
-    ユーザーの入力とこれまでの会話履歴を基にAI応答を生成する
-    
-    Args:
-        user_input (str): ユーザーの入力テキスト
-        conversation_history (list): これまでの会話履歴
-    
-    Returns:
-        str: 生成されたAI応答。エラー時はNone
-    """
-    if not client:
-        show_error("OpenAI APIキーが設定されていません。")
-        return None
-    
-    try:
-        # システムプロンプトを生成
-        system_prompt = generate_system_prompt()
-        
-        # ChatGPT APIを使用して応答を生成
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo-0125",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
-                   "content": text} 
-                  for speaker, text in conversation_history],
-                {"role": "user", "content": user_input}
-            ],
-            temperature=0.7,
-            max_tokens=150
-        )
-        
-        return response.choices[0].message.content
-    except Exception as e:
-        show_error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
-        return None
-
 # セッション状態の初期化
 initialize_session_state()
 session = st.session_state.session
@@ -580,85 +436,8 @@ with st.sidebar:
     if st.button("会話履歴をクリア"):
         reset_conversation()
 
-# マイク認証用コンポーネント
-def authorize_microphone():
-    """マイク認証用のコンポーネントを表示する関数"""
-    st.subheader("🎤 マイク認証")
-    st.info("""
-    このセクションでは、マイクへのアクセスを許可します。
-    「START」ボタンをクリックしてマイクへのアクセスを許可してください。
-    許可後は「STOP」を押して、このコンポーネントを閉じることができます。
-    
-    ※接続に問題がある場合は、下の「手動でマイク認証」ボタンを押してください。
-    """)
-    
-    # WebRTCコンポーネントの表示（音声のみのストリーミング）
-    def video_frame_callback(frame):
-        # 何もしない（マイク認証のみ）
-        return frame
-    
-    def audio_frame_callback(frame):
-        # マイク認証状態を更新
-        if not st.session_state.session.mic_authorized:
-            st.session_state.session.mic_authorized = True
-            # 更新を通知
-            st.success("マイクの認証に成功しました！録音ボタンを使って会話を開始できます。")
-        return frame
-    
-    # 複数のSTUNサーバーを設定
-    rtc_config = {
-        "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]},
-            {"urls": ["stun:stun1.l.google.com:19302"]},
-            {"urls": ["stun:stun2.l.google.com:19302"]},
-            {"urls": ["stun:stun3.l.google.com:19302"]},
-            {"urls": ["stun:stun4.l.google.com:19302"]},
-            {"urls": ["stun:stun.ekiga.net"]}
-        ],
-        "iceTransportPolicy": "all"
-    }
-    
-    # 音声のみを扱うWebRTCコンポーネント
-    try:
-        ctx = webrtc_streamer(
-            key="microphone-auth",
-            mode=WebRtcMode.SENDRECV,
-            audio_processor_factory=lambda: AudioProcessor(audio_frame_callback),
-            video_processor_factory=None,  # ビデオなし
-            media_stream_constraints={"video": False, "audio": True},
-            rtc_configuration=rtc_config,
-            async_processing=True,
-        )
-    except Exception as e:
-        st.error(f"WebRTC接続中にエラーが発生しました: {str(e)}")
-        st.warning("ネットワーク設定やブラウザの設定によって接続できない場合があります。")
-    
-    # 代替のマイク認証方法（手動）
-    if st.button("手動でマイク認証"):
-        st.session_state.session.mic_authorized = True
-        st.success("マイクの認証を手動で完了しました。録音ボタンを使って会話を開始できます。")
-        st.warning("注意: ブラウザのマイク許可を求められた場合は、必ず許可してください。")
-    
-    # マイク認証状態を表示
-    if st.session_state.session.mic_authorized:
-        st.success("✅ マイクの認証は完了しています。録音ボタンを使って会話を開始できます。")
-    
-    return st.session_state.session.mic_authorized
-
-# 音声処理用のクラス
-class AudioProcessor:
-    def __init__(self, callback):
-        self.callback = callback
-    
-    def recv(self, frame):
-        return self.callback(frame)
-
 # 通常会話モードの処理
 if mode == "通常会話モード":
-    # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
-    with st.expander("🎤 マイク認証（接続に問題がある場合はクリック）", expanded=False):
-        authorize_microphone()
-    
     # プロンプトの自動生成
     system_prompt = generate_system_prompt()
     
@@ -770,13 +549,17 @@ if mode == "通常会話モード":
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # 入力方法の選択
-    is_voice_input = render_input_method_selector()
+    # 両方の入力方法を同時に表示
+    st.markdown("### メッセージを入力または音声で話してください")
     
-    if not is_voice_input:
+    # テキスト入力と音声入力を並べて表示
+    col1, col2 = st.columns([3, 2])
+    
+    with col1:
         # テキスト入力処理
         handle_text_input()
-    else:
+    
+    with col2:
         # 音声入力処理
         def on_audio_complete(text):
             if text and text.strip():
@@ -788,21 +571,15 @@ if mode == "通常会話モード":
                 if ai_reply:
                     # AIの応答を会話履歴に追加
                     st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
-                    # 状態を更新し、ページをリロード
-                    st.session_state.update_ui = True  # 新しいフラグを設定
                     st.rerun()
                 else:
                     show_error("AI応答の生成に失敗しました。もう一度お試しください。")
         
-        # 新しい音声入力コンポーネントを使用
-        simple_audio_input(on_audio_complete, key_suffix="conversation")
+        # 音声入力コンポーネントを常に表示
+        simple_audio_input(on_audio_complete)
 
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
-    # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
-    with st.expander("🎤 マイク認証（接続に問題がある場合はクリック）", expanded=False):
-        authorize_microphone()
-    
     st.subheader("ダイアログ練習モード")
     show_info("実際の会話のように、音声で練習できます。あなたの番になったら、録音ボタンを押して話してください。")
     
@@ -869,7 +646,7 @@ if mode == "ダイアログ練習モード":
                     st.rerun()
             
             # 新しい音声入力コンポーネントを使用
-            simple_audio_input(on_dialog_audio_complete, key_suffix="dialog")
+            simple_audio_input(on_dialog_audio_complete)
     
     # ダイアログ完了時
     else:
@@ -886,4 +663,76 @@ if mode == "ダイアログ練習モード":
         if st.button("ダイアログをリセット", key="reset_dialog_button"):
             reset_dialog()
             st.session_state.last_played_line = -1
-            st.rerun() 
+            st.rerun()
+
+# システムプロンプトの生成
+def generate_system_prompt():
+    """現在の設定に基づいてシステムプロンプトを生成"""
+    return f"""
+あなたは英語を話す外国人のお客様です。
+これから美容院のスタッフ（ユーザー）と、英会話講座「{st.session_state.session.lesson_name}」の復習を行います。
+
+【講座テーマ・説明】
+- {st.session_state.session.extra_note}
+- 今日のフレーズ：「{st.session_state.session.key_phrase}」
+- 重要語彙：{st.session_state.session.vocab_list}
+
+【ルール】
+- 必ずこのレッスン内容に沿ったやりとりのみを行う
+- あなた（AI）は、髪の悩みや状態を自然に伝え、スタッフ（ユーザー）がキーフレーズや語彙を使わざるを得ない流れに誘導する
+- 会話の中でキーフレーズや語彙が自然に出てくるようにする
+- スタッフ（ユーザー）が講座のフレーズや語彙を使った場合は、さりげなく肯定的な反応や簡単なフィードバックを与える
+- 会話は自然な流れで継続する（1回の応答で終わらせない）
+- 難しい表現は避け、初級〜中級レベルの英語を使用する
+- お客様らしい自然な反応を心がける（例：髪の悩みを詳しく説明、提案されたケアに興味を示すなど）
+
+【会話の進め方】
+1. 最初は簡単な挨拶から始める
+2. 髪の悩みや要望を徐々に具体的に説明する
+3. スタッフの提案に対して興味を示し、詳しい説明を求める
+4. 会話を自然に展開させ、複数回のやり取りを行う
+5. 必要に応じて新しい話題（髪型、カラー、ヘアケアなど）に展開する
+
+【日本語補足】
+- 会話は英語で行い、必要に応じて簡単な日本語の補足説明を加える
+- 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
+"""
+
+# ChatGPT APIを使用してAI応答を生成する関数
+def generate_ai_response(user_input, conversation_history):
+    """
+    ユーザーの入力とこれまでの会話履歴を基にAI応答を生成する
+    
+    Args:
+        user_input (str): ユーザーの入力テキスト
+        conversation_history (list): これまでの会話履歴
+    
+    Returns:
+        str: 生成されたAI応答。エラー時はNone
+    """
+    if not client:
+        show_error("OpenAI APIキーが設定されていません。")
+        return None
+    
+    try:
+        # システムプロンプトを生成
+        system_prompt = generate_system_prompt()
+        
+        # ChatGPT APIを使用して応答を生成
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo-0125",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *[{"role": "assistant" if speaker == "AI（お客様）" else "user", 
+                   "content": text} 
+                  for speaker, text in conversation_history],
+                {"role": "user", "content": user_input}
+            ],
+            temperature=0.7,
+            max_tokens=150
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        show_error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
+        return None 
