@@ -8,7 +8,8 @@ from openai import OpenAI
 import tempfile
 import wave
 import base64
-from st_audiorec import st_audiorec
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
+import av
 
 # .envからAPIキーを読み込む
 load_dotenv()
@@ -77,13 +78,23 @@ def print_audio_devices():
     except Exception as e:
         st.error(f"デバイス情報の取得中にエラーが発生: {str(e)}")
 
-def record_audio_web():
-    st.info("🎤 下のボタンで録音し、終わったらもう一度押してください")
-    audio_bytes = st_audiorec()
-    if audio_bytes is not None:
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            f.write(audio_bytes)
-            return f.name
+def record_audio_webrtc():
+    webrtc_ctx = webrtc_streamer(
+        key="sendonly-audio",
+        mode=WebRtcMode.SENDONLY,
+        audio_receiver_size=1024,
+        media_stream_constraints={"audio": True, "video": False},
+        async_processing=True,
+    )
+    audio_frames = []
+    if webrtc_ctx.audio_receiver:
+        audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
+        if audio_frames:
+            # WAVファイルとして保存
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                for frame in audio_frames:
+                    f.write(frame.to_ndarray().tobytes())
+                return f.name
     return None
 
 st.set_page_config(page_title="英会話学習サービス Lesson 29", layout="centered")
@@ -265,7 +276,7 @@ if mode == "通常会話モード":
     else:
         # 音声入力
         if st.button("🎤 音声入力開始"):
-            audio_file = record_audio_web()
+            audio_file = record_audio_webrtc()
             if audio_file and client:
                 with open(audio_file, "rb") as f:
                     # WhisperでSTT
@@ -350,7 +361,7 @@ if mode == "ダイアログ練習モード":
             
             # 音声入力ボタン
             if st.button("🎤 マイクで話す", key=f"mic_button_{current_position}"):
-                audio_file = record_audio_web()
+                audio_file = record_audio_webrtc()
                 if audio_file and client:
                     with open(audio_file, "rb") as f:
                         # WhisperでSTT

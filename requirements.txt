@@ -6,6 +6,5 @@ gTTS
 pydub
 pyttsx3
 streamlit-webrtc
-streamlit-audio-recorder
 numpy
 python-dotenv==1.0.0 
