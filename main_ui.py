@@ -733,6 +733,8 @@ if mode == "ダイアログ練習モード":
         
         # AIの番の場合
         if current_line["role"] == "Customer":
+            st.markdown("### AIがお客様の役を話しています")
+            
             # まだ再生していない場合のみ音声を再生
             if st.session_state.last_played_line != current_position:
                 try:
@@ -753,7 +755,10 @@ if mode == "ダイアログ練習モード":
                         # 「次へ」ボタンを表示して、ユーザーが確認してから次に進めるようにする
                         st.success("音声再生完了")
                         if st.button("次へ進む ▶", key=f"next_btn_{current_position}"):
+                            # 次の行に進む
                             st.session_state.dialog_progress += 1
+                            # 音声再生状態をリセット
+                            st.session_state.last_played_line = -1
                             st.rerun()
                 except Exception as e:
                     show_error(f"音声の再生に失敗しました: {str(e)}")
@@ -821,8 +826,12 @@ if mode == "ダイアログ練習モード":
     else:
         show_success("🎉 おめでとうございます！ダイアログを完了しました。")
         if st.button("もう一度練習する", key="restart_button"):
+            # ダイアログをリセット
             st.session_state.dialog_progress = 0
             st.session_state.last_played_line = -1
+            # 音声データのキャッシュもクリア
+            if "last_dialog_audio_data" in st.session_state:
+                st.session_state.last_dialog_audio_data = None
             st.rerun()
     
     # サイドバーでの編集機能
@@ -832,4 +841,7 @@ if mode == "ダイアログ練習モード":
         if st.button("ダイアログをリセット", key="reset_dialog_button"):
             reset_dialog()
             st.session_state.last_played_line = -1
+            # 音声データのキャッシュもクリア
+            if "last_dialog_audio_data" in st.session_state:
+                st.session_state.last_dialog_audio_data = None
             st.rerun() 
