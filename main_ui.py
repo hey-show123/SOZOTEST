@@ -331,18 +331,25 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
     ※録音中は赤いボタンが表示されます
     """)
     
-    # セッション状態の初期化
-    if f"audio_bytes_{key_suffix}" not in st.session_state:
-        st.session_state[f"audio_bytes_{key_suffix}"] = None
+    # 音声データの保存キー
+    audio_bytes_key = f"audio_bytes_{key_suffix}"
+    processed_key = f"processed_{key_suffix}"
     
-    # 音声録音コンポーネントの表示（セッション間で状態を保持するためにキーを使用）
+    # セッション状態の初期化
+    if audio_bytes_key not in st.session_state:
+        st.session_state[audio_bytes_key] = None
+    
+    if processed_key not in st.session_state:
+        st.session_state[processed_key] = False
+    
+    # 音声録音コンポーネントの表示（ユニークなキーを使用）
     audio_bytes = audio_recorder(
         text="",
         recording_color="#e74c3c",
         neutral_color="#3498db",
         icon_name="microphone",
         icon_size="2x",
-        key=f"audio_recorder_{key_suffix}"
+        key=f"audio_recorder_{key_suffix}_{int(time.time())}"  # タイムスタンプを追加して常に新しいコンポーネントを作成
     )
     
     # 音声データがある場合は処理
@@ -355,12 +362,12 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
         # ユーザーに音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
-        # セッション状態を更新（処理済みマーク）
-        current_bytes = st.session_state.get(f"audio_bytes_{key_suffix}")
-        
-        # 新しい録音データの場合のみ処理（同じデータの重複処理を防止）
-        if current_bytes != audio_bytes:
-            st.session_state[f"audio_bytes_{key_suffix}"] = audio_bytes
+        # 前回と同じ音声データでなく、かつまだ処理されていない場合のみ処理
+        current_bytes = st.session_state.get(audio_bytes_key)
+        if (current_bytes != audio_bytes or not st.session_state[processed_key]) and len(audio_bytes) > 100:
+            # 処理中フラグを設定
+            st.session_state[processed_key] = True
+            st.session_state[audio_bytes_key] = audio_bytes
             
             with st.spinner("音声を認識中..."):
                 # Whisper APIで音声認識
@@ -368,9 +375,17 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
                 
                 if transcription:
                     show_success(f"音声認識結果: {transcription}")
+                    # コールバック関数を呼び出し
                     on_audio_complete(transcription)
+                    # 処理後にフラグをリセット（次回の録音のため）
+                    st.session_state[processed_key] = False
+                    st.session_state[audio_bytes_key] = None
                 else:
                     show_error("音声認識に失敗しました。もう一度お試しください。")
+                    # エラー時もフラグをリセット
+                    st.session_state[processed_key] = False
+        elif st.session_state[processed_key]:
+            st.info("音声処理中または処理済みです。新しい録音を行うには、再度録音ボタンを押してください。")
     
     return True
 
@@ -770,6 +785,16 @@ if mode == "通常会話モード":
                 if ai_reply:
                     # AIの応答を会話履歴に追加
                     st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
+                    
+                    # セッション状態をリセットして次の入力に備える
+                    audio_bytes_key = f"audio_bytes_conversation"
+                    processed_key = f"processed_conversation"
+                    if audio_bytes_key in st.session_state:
+                        st.session_state[audio_bytes_key] = None
+                    if processed_key in st.session_state:
+                        st.session_state[processed_key] = False
+                    
+                    # 画面を再描画
                     st.rerun()
                 else:
                     show_error("AI応答の生成に失敗しました。もう一度お試しください。")
@@ -843,6 +868,15 @@ if mode == "ダイアログ練習モード":
             def on_dialog_audio_complete(text):
                 if text and text.strip():
                     show_success(f"あなたの発話: {text}")
+                    
+                    # セッション状態をリセットして次の入力に備える
+                    audio_bytes_key = f"audio_bytes_dialog"
+                    processed_key = f"processed_dialog"
+                    if audio_bytes_key in st.session_state:
+                        st.session_state[audio_bytes_key] = None
+                    if processed_key in st.session_state:
+                        st.session_state[processed_key] = False
+                    
                     # 次の行に進む
                     st.session_state.dialog_progress += 1
                     st.session_state.last_played_line = -1  # 音声再生状態をリセット
