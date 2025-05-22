@@ -55,7 +55,6 @@ class SessionState:
         self.initialized = False
         self.conversation_history = []
         self.selected_voice = "alloy"
-        self.play_audio = None
         self.message_input = ""
         self.dialog_progress = 0
         self.waiting_for_input = False
@@ -79,7 +78,6 @@ def reset_conversation():
     if "session" in st.session_state:
         st.session_state.session.conversation_history = []
         st.session_state.message = ""
-        st.session_state.session.play_audio = None
         show_success("会話履歴をリセットしました。")
 
 def reset_dialog():
@@ -197,12 +195,19 @@ def speak_text(text):
         show_error("OpenAI APIキーが設定されていません。")
         return False
     try:
-        selected_voice = st.session_state.get("selected_voice", "alloy")
+        # 選択された声を取得
+        selected_voice = st.session_state.session.selected_voice
+        
+        # デバッグ情報
+        # show_info(f"音声合成を開始します: 音声={selected_voice}, テキスト長={len(text)}")
+        
+        # 音声合成API呼び出し
         response = client.audio.speech.create(
             model="tts-1",
             voice=selected_voice,
             input=text
         )
+        
         # 一時ファイルに保存
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(response.content)
@@ -215,31 +220,29 @@ def speak_text(text):
                 b64 = base64.b64encode(audio_bytes).decode()
                 
                 # 音声プレーヤーのHTML/JavaScriptを改善
+                audio_id = f"audio_{int(time.time() * 1000)}"
                 md_audio = f'''
-                <div style="display: none;" id="audio_status_{hash(text)}"></div>
                 <div style="margin: 10px 0;">
-                    <audio id="audio_{hash(text)}" 
+                    <audio id="{audio_id}" 
                            src="data:audio/mp3;base64,{b64}" 
-                           style="width: 0; height: 0;"
-                           onplay="document.getElementById('audio_status_{hash(text)}').innerText='playing'"
-                           onended="document.getElementById('audio_status_{hash(text)}').innerText='ended'"
-                           onerror="document.getElementById('audio_status_{hash(text)}').innerText='error'">
+                           autoplay="true"
+                           controls="true"
+                           style="width: 100%;">
                     </audio>
                     <script>
                         try {{
-                            const audio = document.getElementById('audio_{hash(text)}');
+                            const audio = document.getElementById('{audio_id}');
                             audio.play().catch(function(error) {{
                                 console.error('音声の自動再生に失敗:', error);
-                                document.getElementById('audio_status_{hash(text)}').innerText = 'error: ' + error.message;
                             }});
                         }} catch (e) {{
                             console.error('音声再生の初期化に失敗:', e);
-                            document.getElementById('audio_status_{hash(text)}').innerText = 'init error: ' + e.message;
                         }}
                     </script>
                 </div>
                 '''
                 st.markdown(md_audio, unsafe_allow_html=True)
+                # show_success("音声を再生しています...")
         except Exception as e:
             show_error(f"音声ファイルの処理中にエラーが発生しました: {str(e)}")
             return False
@@ -565,7 +568,6 @@ def handle_text_input():
         if ai_reply:
             # AIの応答を会話履歴に追加
             st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
-            st.session_state.session.play_audio = ai_reply
         else:
             show_error("AI応答の生成に失敗しました。もう一度お試しください。")
         
@@ -677,17 +679,15 @@ if mode == "通常会話モード":
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # AIの最後の応答であれば音声を再生
+            if i == len(st.session_state.session.conversation_history) - 1:
+                try:
+                    speak_text(text)
+                except Exception as e:
+                    show_error(f"音声再生中にエラーが発生しました: {str(e)}")
     
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # 音声の再生チェック
-    if st.session_state.session.play_audio:
-        try:
-            if speak_text(st.session_state.session.play_audio):
-                st.session_state.session.play_audio = None
-        except Exception as e:
-            show_error(f"音声再生中にエラーが発生しました: {str(e)}")
-            st.session_state.session.play_audio = None
     
     # 入力方法の選択
     is_voice_input = render_input_method_selector()
