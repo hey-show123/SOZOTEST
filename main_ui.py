@@ -318,8 +318,9 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
     """
     # マイク認証状態を確認
     if not st.session_state.session.mic_authorized:
-        st.warning("マイクの認証が必要です。上部のマイク認証セクションでマイクを許可してください。")
-        return False
+        st.warning("マイクの認証が完了していません。下の録音ボタンでマイク認証も兼ねて録音を開始できます。")
+    else:
+        st.success("マイクの認証は完了しています。下の録音ボタンで録音を開始できます。")
     
     st.info("""
     ### 音声入力の使い方
@@ -346,6 +347,11 @@ def simple_audio_input(on_audio_complete, key_suffix=""):
     
     # 音声データがある場合は処理
     if audio_bytes:
+        # マイク認証状態を更新（録音できた = マイクは許可されている）
+        if not st.session_state.session.mic_authorized:
+            st.session_state.session.mic_authorized = True
+            st.success("マイクの認証が完了しました！")
+        
         # ユーザーに音声を再生
         st.audio(audio_bytes, format="audio/wav")
         
@@ -564,6 +570,8 @@ def authorize_microphone():
     このセクションでは、マイクへのアクセスを許可します。
     「START」ボタンをクリックしてマイクへのアクセスを許可してください。
     許可後は「STOP」を押して、このコンポーネントを閉じることができます。
+    
+    ※接続に問題がある場合は、下の「手動でマイク認証」ボタンを押してください。
     """)
     
     # WebRTCコンポーネントの表示（音声のみのストリーミング）
@@ -576,18 +584,42 @@ def authorize_microphone():
         if not st.session_state.session.mic_authorized:
             st.session_state.session.mic_authorized = True
             # 更新を通知
-            st.info("マイクの認証に成功しました！録音ボタンを使って会話を開始できます。")
+            st.success("マイクの認証に成功しました！録音ボタンを使って会話を開始できます。")
         return frame
     
+    # 複数のSTUNサーバーを設定
+    rtc_config = {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302"]},
+            {"urls": ["stun:stun3.l.google.com:19302"]},
+            {"urls": ["stun:stun4.l.google.com:19302"]},
+            {"urls": ["stun:stun.ekiga.net"]}
+        ],
+        "iceTransportPolicy": "all"
+    }
+    
     # 音声のみを扱うWebRTCコンポーネント
-    ctx = webrtc_streamer(
-        key="microphone-auth",
-        mode=WebRtcMode.SENDRECV,
-        audio_processor_factory=lambda: AudioProcessor(audio_frame_callback),
-        video_processor_factory=None,  # ビデオなし
-        media_stream_constraints={"video": False, "audio": True},
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-    )
+    try:
+        ctx = webrtc_streamer(
+            key="microphone-auth",
+            mode=WebRtcMode.SENDRECV,
+            audio_processor_factory=lambda: AudioProcessor(audio_frame_callback),
+            video_processor_factory=None,  # ビデオなし
+            media_stream_constraints={"video": False, "audio": True},
+            rtc_configuration=rtc_config,
+            async_processing=True,
+        )
+    except Exception as e:
+        st.error(f"WebRTC接続中にエラーが発生しました: {str(e)}")
+        st.warning("ネットワーク設定やブラウザの設定によって接続できない場合があります。")
+    
+    # 代替のマイク認証方法（手動）
+    if st.button("手動でマイク認証"):
+        st.session_state.session.mic_authorized = True
+        st.success("マイクの認証を手動で完了しました。録音ボタンを使って会話を開始できます。")
+        st.warning("注意: ブラウザのマイク許可を求められた場合は、必ず許可してください。")
     
     # マイク認証状態を表示
     if st.session_state.session.mic_authorized:
@@ -606,7 +638,7 @@ class AudioProcessor:
 # 通常会話モードの処理
 if mode == "通常会話モード":
     # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
-    with st.expander("🎤 マイク認証", expanded=not st.session_state.session.mic_authorized):
+    with st.expander("🎤 マイク認証（接続に問題がある場合はクリック）", expanded=False):
         authorize_microphone()
     
     # プロンプトの自動生成
@@ -748,7 +780,7 @@ if mode == "通常会話モード":
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
     # マイク認証コンポーネントをページ最上部に表示（折りたたみ可能なexpanderで表示）
-    with st.expander("🎤 マイク認証", expanded=not st.session_state.session.mic_authorized):
+    with st.expander("🎤 マイク認証（接続に問題がある場合はクリック）", expanded=False):
         authorize_microphone()
     
     st.subheader("ダイアログ練習モード")
