@@ -84,8 +84,10 @@ def reset_dialog():
     """ダイアログ練習の状態リセット"""
     if "session" in st.session_state:
         st.session_state.session.dialog_lines = default_dialog()
-        st.session_state.session.dialog_progress = 0
-        st.session_state.session.waiting_for_input = False
+        st.session_state.dialog_progress = 0
+        st.session_state.waiting_for_input = False
+        if "last_played_line" in st.session_state:
+            st.session_state.last_played_line = -1
         show_success("ダイアログをリセットしました。")
 
 def update_lesson_settings(lesson_name, key_phrase, vocab_list, extra_note):
@@ -314,7 +316,7 @@ def record_5sec_and_send(client, on_transcript):
     # 録音ボタンのUI
     col1, col2 = st.columns([1, 4])
     with col1:
-        if st.button("🎤 録音開始", disabled=audio_state.is_recording):
+        if st.button("🎤 録音開始", disabled=audio_state.is_recording, key="record_button"):
             audio_state.is_recording = True
             audio_state.status = "recording"
             audio_state.recording_start_time = time.time()
@@ -336,6 +338,7 @@ def record_5sec_and_send(client, on_transcript):
             try:
                 # 録音の進行状況を更新
                 elapsed = time.time() - audio_state.recording_start_time if audio_state.recording_start_time else 0
+                audio_state.recording_duration = elapsed
                 
                 # 録音完了の判定
                 if elapsed >= CHUNK_DURATION:
@@ -697,6 +700,20 @@ if mode == "通常会話モード":
         handle_text_input()
     else:
         # 音声入力処理
+        def on_transcript(text):
+            if text and text.strip():
+                # ユーザーの発言を会話履歴に追加
+                st.session_state.session.conversation_history.append(("あなた（スタッフ）", text))
+                
+                # AI応答を生成
+                ai_reply = generate_ai_response(text, st.session_state.session.conversation_history[:-1])
+                if ai_reply:
+                    # AIの応答を会話履歴に追加
+                    st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
+                    st.rerun()
+                else:
+                    show_error("AI応答の生成に失敗しました。もう一度お試しください。")
+        
         record_5sec_and_send(client, on_transcript)
 
 # --- ダイアログ練習モード ---
@@ -709,12 +726,15 @@ if mode == "ダイアログ練習モード":
         st.session_state.dialog_progress = 0
     if "waiting_for_input" not in st.session_state:
         st.session_state.waiting_for_input = False
+    if "last_played_line" not in st.session_state:
+        st.session_state.last_played_line = -1
     
     dialog_lines = session.dialog_lines
     current_position = st.session_state.dialog_progress
     
     # 進行状況の表示
-    progress_bar = st.progress(current_position / len(dialog_lines))
+    progress = current_position / len(dialog_lines) if dialog_lines else 0
+    progress_bar = st.progress(progress)
     st.markdown("---")
     
     # ダイアログの表示と実行
@@ -737,24 +757,36 @@ if mode == "ダイアログ練習モード":
         
         # AIの番の場合
         if current_line["role"] == "Customer":
-            if "play_audio" not in st.session_state:
-                st.session_state.play_audio = None
-            st.session_state.play_audio = current_line["text"]
-            if speak_text(current_line["text"]):
-                st.session_state.dialog_progress += 1
-            else:
-                show_error("音声の再生に失敗しました。もう一度試してください。")
+            # まだ再生していない場合のみ音声を再生
+            if st.session_state.last_played_line != current_position:
+                try:
+                    if speak_text(current_line["text"]):
+                        st.session_state.last_played_line = current_position
+                        # 一定時間後に次の行に進む
+                        time.sleep(0.5)  # 安定のため少し待機
+                        st.session_state.dialog_progress += 1
+                        st.rerun()
+                except Exception as e:
+                    show_error(f"音声の再生に失敗しました: {str(e)}")
         
         # ユーザーの番の場合
         else:
             st.markdown("### あなたの番です")
             st.markdown(f"🎯 次のセリフを話してください: **{current_line['text']}**")
+            
             def on_dialog_transcript(text):
                 if not text or text.strip() == "":
                     show_error("音声が認識できませんでした。もう一度録音してください。")
                     return
+                
                 show_success(f"あなたの発話: {text}")
+                
+                # 次の行に進む
                 st.session_state.dialog_progress += 1
+                st.session_state.last_played_line = -1  # 音声再生状態をリセット
+                st.rerun()
+            
+            # 音声録音機能を呼び出し
             record_5sec_and_send(client, on_dialog_transcript)
     
     # ダイアログ完了時
@@ -762,6 +794,7 @@ if mode == "ダイアログ練習モード":
         show_success("🎉 おめでとうございます！ダイアログを完了しました。")
         if st.button("もう一度練習する", key="restart_button"):
             st.session_state.dialog_progress = 0
+            st.session_state.last_played_line = -1
             st.rerun()
     
     # サイドバーでの編集機能
@@ -770,4 +803,5 @@ if mode == "ダイアログ練習モード":
         st.subheader("ダイアログ編集")
         if st.button("ダイアログをリセット", key="reset_dialog_button"):
             reset_dialog()
+            st.session_state.last_played_line = -1
             st.rerun() 
