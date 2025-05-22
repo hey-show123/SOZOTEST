@@ -13,6 +13,12 @@ import tempfile
 import base64
 import time
 from openai import OpenAI
+import io
+import numpy as np
+from datetime import datetime
+
+# 音声録音用コンポーネント
+from audio_recorder_streamlit import audio_recorder
 
 # .envからAPIキーを読み込む
 load_dotenv()
@@ -241,164 +247,100 @@ def speak_text(text):
         show_error(f"音声合成中にエラーが発生しました: {str(e)}")
         return False
 
-# シンプルな音声録音コンポーネント
-def simple_audio_recorder(on_audio_complete):
-    """ブラウザのネイティブ録音機能を使用する簡易的な録音コンポーネント"""
+# 音声認識処理（Whisper API）
+def transcribe_audio(audio_bytes):
+    """
+    音声データをWhisper APIで認識する
     
-    # 録音状態を管理
-    if "recording" not in st.session_state:
-        st.session_state.recording = False
-    if "audio_data" not in st.session_state:
-        st.session_state.audio_data = None
+    Args:
+        audio_bytes (bytes): 音声データのバイト列
     
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🎤 録音開始", key="start_recording", disabled=st.session_state.recording):
-            st.session_state.recording = True
-            st.session_state.audio_data = None
-            st.rerun()
-    with col2:
-        if st.button("⏹️ 録音停止", key="stop_recording", disabled=not st.session_state.recording):
-            st.session_state.recording = False
-            st.rerun()
+    Returns:
+        str: 認識されたテキスト。エラー時はNone
+    """
+    if not client:
+        show_error("OpenAI APIキーが設定されていません。")
+        return None
     
-    if st.session_state.recording:
-        # ブラウザでのオーディオ録音を実装
-        st.markdown("""
-        <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-bottom: 10px;">
-            <div id="recording-status" style="color: red; font-weight: bold; margin-bottom: 10px;">🔴 録音中... マイクに向かって話してください</div>
-            <div id="timer" style="font-size: 24px; text-align: center; margin-bottom: 10px;">0:00</div>
-            <script>
-                // 録音のセットアップ
-                let mediaRecorder;
-                let audioChunks = [];
-                let startTime;
-                let timerInterval;
-                
-                // タイマー表示の更新
-                function updateTimer() {
-                    const now = new Date();
-                    const elapsedSeconds = Math.floor((now - startTime) / 1000);
-                    const minutes = Math.floor(elapsedSeconds / 60);
-                    const seconds = elapsedSeconds % 60;
-                    document.getElementById('timer').textContent = 
-                        `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                }
-                
-                // 録音の開始
-                async function startRecording() {
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        mediaRecorder = new MediaRecorder(stream);
-                        audioChunks = [];
-                        
-                        mediaRecorder.ondataavailable = (event) => {
-                            if (event.data.size > 0) {
-                                audioChunks.push(event.data);
-                            }
-                        };
-                        
-                        mediaRecorder.onstop = () => {
-                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                            const reader = new FileReader();
-                            reader.readAsDataURL(audioBlob);
-                            reader.onloadend = () => {
-                                const base64data = reader.result;
-                                // Streamlitに録音データを送信
-                                if (window.parent) {
-                                    window.parent.postMessage({
-                                        type: "streamlit:setComponentValue",
-                                        value: base64data
-                                    }, "*");
-                                }
-                            };
-                            
-                            // タイマーの停止
-                            clearInterval(timerInterval);
-                        };
-                        
-                        mediaRecorder.start();
-                        startTime = new Date();
-                        
-                        // タイマーの開始
-                        timerInterval = setInterval(updateTimer, 1000);
-                        
-                        // Streamlitの再レンダリングを検出して録音を停止
-                        const observer = new MutationObserver((mutations) => {
-                            for (const mutation of mutations) {
-                                if (mutation.type === 'childList' && 
-                                    !document.getElementById('recording-status')) {
-                                    if (mediaRecorder && mediaRecorder.state === 'recording') {
-                                        mediaRecorder.stop();
-                                        clearInterval(timerInterval);
-                                    }
-                                    observer.disconnect();
-                                    break;
-                                }
-                            }
-                        });
-                        
-                        observer.observe(document.body, { childList: true, subtree: true });
-                        
-                    } catch (err) {
-                        document.getElementById('recording-status').innerHTML = 
-                            `録音の初期化に失敗しました: ${err.message}<br>マイクへのアクセス許可を確認してください。`;
-                        document.getElementById('recording-status').style.color = '#dc2626';
-                    }
-                }
-                
-                // 録音を開始
-                startRecording();
-            </script>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # 録音データを受け取るための隠しコンポーネント
-    audio_data = st.text_input("", key="audio_input", label_visibility="collapsed")
-    
-    # 録音データが取得できたら処理
-    if audio_data and audio_data.startswith("data:audio"):
-        st.session_state.audio_data = audio_data
-        st.session_state.recording = False
+    try:
+        # 一時ファイルに保存
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(audio_bytes)
+            temp_file = f.name
         
-        # 録音された音声を表示
-        st.audio(audio_data)
+        st.info(f"音声ファイルのサイズ: {len(audio_bytes)} バイト")
         
-        # 音声認識処理
-        if client:
+        # Whisper APIを呼び出し
+        with open(temp_file, "rb") as audio_file:
             try:
-                # Base64データをバイナリに変換
-                audio_binary = base64.b64decode(audio_data.split(",")[1])
+                response = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="text"
+                )
+                st.success("Whisper API処理完了")
                 
-                # 一時ファイルに保存
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                    f.write(audio_binary)
-                    temp_audio_file = f.name
-                
-                # WhisperAPIで音声認識
-                with open(temp_audio_file, "rb") as audio_file:
-                    transcript = client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file
-                    )
-                
-                # 一時ファイルを削除
-                try:
-                    os.unlink(temp_audio_file)
-                except:
-                    pass
-                
-                # 認識テキストがあれば処理
-                if transcript.text and transcript.text.strip():
-                    show_success(f"音声認識結果: {transcript.text}")
-                    on_audio_complete(transcript.text)
+                if isinstance(response, str) and response.strip():
+                    return response.strip()
                 else:
-                    show_warning("音声が認識できませんでした。もう一度録音してください。")
-            
+                    st.warning("音声認識結果が空でした")
+                    return None
+                
             except Exception as e:
-                show_error(f"音声認識処理中にエラーが発生しました: {str(e)}")
-        else:
-            show_error("OpenAI APIが初期化されていません。APIキーを確認してください。")
+                show_error(f"Whisper API呼び出し中にエラーが発生しました: {str(e)}")
+                return None
+            
+    except Exception as e:
+        show_error(f"音声認識の前処理中にエラーが発生しました: {str(e)}")
+        return None
+    finally:
+        # 一時ファイルを削除
+        try:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+        except Exception as e:
+            st.warning(f"一時ファイルの削除に失敗しました: {str(e)}")
+    
+    return None
+
+# 簡易音声録音入力
+def simple_audio_input(on_audio_complete):
+    """
+    Streamlitの音声録音コンポーネントを使用した簡易音声入力
+    
+    Args:
+        on_audio_complete (func): 音声認識完了時のコールバック関数
+    """
+    st.info("""
+    ### 音声入力の使い方
+    1. 「録音」ボタンをクリックしてマイクへのアクセスを許可してください
+    2. 話し終わったら再度ボタンをクリックして録音を停止します
+    3. 自動的に音声認識が行われます
+    
+    ※録音中は赤いボタンが表示されます
+    """)
+    
+    # audio_recorder_streamlitパッケージのコンポーネントを使用
+    audio_bytes = audio_recorder(
+        text="",
+        recording_color="#e74c3c",
+        neutral_color="#3498db",
+        icon_name="microphone",
+        icon_size="2x"
+    )
+    
+    if audio_bytes:
+        st.audio(audio_bytes, format="audio/wav")
+        
+        with st.spinner("音声を認識中..."):
+            # Whisper APIで音声認識
+            transcription = transcribe_audio(audio_bytes)
+            
+            if transcription:
+                show_success(f"音声認識結果: {transcription}")
+                on_audio_complete(transcription)
+            else:
+                show_error("音声認識に失敗しました。もう一度お試しください。")
 
 # テキスト入力処理の修正
 def handle_text_input():
@@ -462,12 +404,7 @@ def render_input_method_selector():
         if input_method == "💬 テキスト":
             show_info("テキストを入力して送信ボタンを押してください")
         else:
-            show_info("""「録音開始」ボタンを押して話し、「録音停止」ボタンを押して送信します。
-            
-注意事項:
-1. マイクへのアクセスを許可してください
-2. 録音中は赤い録音中表示が出ます
-3. 録音が完了すると音声認識が行われます""")
+            show_info("「録音」ボタンを押して話し、もう一度ボタンを押して録音を完了します。")
     return input_method == "🎤 音声"
 
 # システムプロンプトの生成
@@ -728,7 +665,8 @@ if mode == "通常会話モード":
                 else:
                     show_error("AI応答の生成に失敗しました。もう一度お試しください。")
         
-        simple_audio_recorder(on_audio_complete)
+        # 新しい音声入力コンポーネントを使用
+        simple_audio_input(on_audio_complete)
 
 # --- ダイアログ練習モード ---
 if mode == "ダイアログ練習モード":
@@ -797,8 +735,8 @@ if mode == "ダイアログ練習モード":
                     st.session_state.last_played_line = -1  # 音声再生状態をリセット
                     st.rerun()
             
-            # シンプル録音機能を使用
-            simple_audio_recorder(on_dialog_audio_complete)
+            # 新しい音声入力コンポーネントを使用
+            simple_audio_input(on_dialog_audio_complete)
     
     # ダイアログ完了時
     else:
