@@ -273,6 +273,7 @@ class Recorder(AudioProcessorBase):
         self.frames = []
         self.start_time = None
         self.status = "initializing"
+        self.error = None
 
     def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
         try:
@@ -290,6 +291,7 @@ class Recorder(AudioProcessorBase):
             return frame
         except Exception as e:
             self.status = "error"
+            self.error = str(e)
             st.session_state.audio_state.error_message = str(e)
             return frame
 
@@ -308,6 +310,13 @@ def show_recording_status():
         st.markdown("⚙️ 音声を処理中...")
     elif audio_state.status == "error":
         show_error(f"録音中にエラーが発生しました: {audio_state.error_message}")
+        st.markdown("""
+        **WebRTC接続の問題が発生している可能性があります。以下を試してください：**
+        1. ブラウザがマイクへのアクセスを許可しているか確認
+        2. ブラウザを更新する
+        3. 別のブラウザを試す
+        4. ネットワーク接続を確認
+        """)
 
 # --- 5秒自動録音UI ---
 def record_5sec_and_send(client, on_transcript):
@@ -321,10 +330,30 @@ def record_5sec_and_send(client, on_transcript):
             audio_state.status = "recording"
             audio_state.recording_start_time = time.time()
             audio_state.error_message = None
+            st.rerun()  # ボタン押下後すぐに再描画
     with col2:
         show_recording_status()
 
     if audio_state.is_recording:
+        # WebRTC用のRTCConfiguration設定
+        rtc_configuration = {
+            "iceServers": [
+                {"urls": ["stun:stun.l.google.com:19302"]},
+                {"urls": ["stun:stun1.l.google.com:19302"]},
+                {"urls": ["stun:stun2.l.google.com:19302"]},
+            ]
+        }
+        
+        # WebRTC接続の状態表示
+        with st.expander("WebRTC接続の詳細 (問題が発生した場合に開いてください)", expanded=False):
+            st.info("""
+            WebRTC接続の状態は、ブラウザのコンソールで確認できます。
+            接続に問題がある場合:
+            - ブラウザのコンソールを開き（F12キー）、エラーメッセージを確認
+            - 別のブラウザや別のネットワーク環境を試す
+            - Streamlitサーバーを再起動する
+            """)
+        
         webrtc_ctx = webrtc_streamer(
             key="audio-recorder",
             mode=WebRtcMode.SENDONLY,
@@ -332,6 +361,7 @@ def record_5sec_and_send(client, on_transcript):
             media_stream_constraints={"audio": True, "video": False},
             audio_processor_factory=Recorder,
             async_processing=True,
+            rtc_configuration=rtc_configuration,  # STUNサーバー設定を追加
         )
 
         if webrtc_ctx.audio_processor:
@@ -401,7 +431,13 @@ def render_input_method_selector():
         if input_method == "💬 テキスト":
             show_info("テキストを入力して送信ボタンを押してください")
         else:
-            show_info("録音ボタンを押して話しかけてください（5秒間）")
+            show_info("""録音ボタンを押して話しかけてください（5秒間）
+            
+接続に問題がある場合:
+1. ブラウザがマイクへのアクセスを許可しているか確認
+2. 別のブラウザ(ChromeやFirefox)を試す
+3. ネットワーク接続を確認
+4. VPNを使用している場合は無効化してみる""")
     return input_method == "🎤 音声"
 
 # セッション状態の初期化
