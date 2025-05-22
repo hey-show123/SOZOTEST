@@ -17,6 +17,16 @@ load_dotenv()
 # OpenAIクライアントの初期化
 client = None
 
+# APIキーの設定
+if "OPENAI_API_KEY" not in os.environ:
+    st.warning("OpenAI APIキーが設定されていません。")
+    api_key = st.text_input("OpenAI APIキーを入力してください", type="password")
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
+        client = OpenAI(api_key=api_key)
+else:
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
 # 利用可能な声の設定
 AVAILABLE_VOICES = {
     "Alloy (中性的)": "alloy",
@@ -162,8 +172,19 @@ with st.sidebar:
     # 選択された声の名前からvoice_idを取得してセッションステートに保存
     st.session_state.selected_voice = AVAILABLE_VOICES[selected_voice_name]
     
+    st.info("音声テストを実行すると、選択した声でテスト音声が再生されます。\n音量を確認してから会話を始めましょう。")
+    
     if st.button("音声テスト"):
-        speak_text("Hello! This is a test of the selected voice. How do I sound?")
+        if not client:
+            st.error("OpenAI APIキーが設定されていません。サイドバー上部でAPIキーを設定してください。")
+        else:
+            test_text = "こんにちは！これは音声テストです。Hello! This is a voice test. 音声が聞こえますか？"
+            try:
+                speak_text(test_text)
+                st.success("✅ 音声テストを実行しました。音声が再生されているはずです。")
+                st.info("※音声が聞こえない場合は、以下を確認してください：\n1. ブラウザの音量設定\n2. デバイスの音量設定\n3. ブラウザの自動再生設定")
+            except Exception as e:
+                st.error(f"❌ 音声テスト中にエラーが発生しました: {str(e)}")
     
     st.markdown("---")
     
@@ -220,38 +241,6 @@ with st.sidebar:
             st.session_state.dialog_lines = default_dialog()
             st.session_state.dialog_progress = 0  # 進行状況をリセット
             st.success("ダイアログを初期化しました。")
-
-# --- APIキーの設定 ---
-if "OPENAI_API_KEY" not in os.environ:
-    st.warning("OpenAI APIキーが設定されていません。")
-    api_key = st.text_input("OpenAI APIキーを入力してください", type="password")
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
-        client = OpenAI(api_key=api_key)
-else:
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
-st.markdown("---")
-
-# --- 録音UIを常時表示する関数 ---
-def get_audio_file_from_webrtc():
-    st.info("下の録音UIで『START』を押して話し、5秒以内に『STOP』を押してください。STOP後に音声認識が実行できます。\n\n※録音が完了していない場合は音声認識できません。")
-    webrtc_ctx = webrtc_streamer(
-        key="audio",
-        mode=WebRtcMode.SENDONLY,
-        audio_receiver_size=1024,
-        media_stream_constraints={"audio": True, "video": False},
-        async_processing=True,
-    )
-    audio_file = None
-    if webrtc_ctx.audio_receiver:
-        audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
-        if audio_frames:
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                for frame in audio_frames:
-                    f.write(frame.to_ndarray().tobytes())
-                audio_file = f.name
-    return audio_file
 
 # --- 通常会話モード ---
 if mode == "通常会話モード":
