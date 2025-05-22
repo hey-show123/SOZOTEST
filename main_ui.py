@@ -57,8 +57,15 @@ def speak_text(text):
         with open(temp_file, "rb") as audio_file:
             audio_bytes = audio_file.read()
             b64 = base64.b64encode(audio_bytes).decode()
-            audio_html = f'<audio controls autoplay src="data:audio/mp3;base64,{b64}"></audio>'
-            st.markdown(audio_html, unsafe_allow_html=True)
+            md_audio = f'''
+            <div style="margin: 10px 0;">
+                <p style="margin-bottom: 5px;">🔊 音声を再生するには下のプレーヤーをクリックしてください：</p>
+                <audio controls src="data:audio/mp3;base64,{b64}">
+                    お使いのブラウザは音声再生をサポートしていません。
+                </audio>
+            </div>
+            '''
+            st.markdown(md_audio, unsafe_allow_html=True)
         os.unlink(temp_file)
     except Exception as e:
         st.error(f"音声合成中にエラーが発生しました: {str(e)}")
@@ -309,14 +316,12 @@ if mode == "通常会話モード":
                     
                     # AI応答を音声で再生
                     try:
-                        st.info("🔊 音声を生成中...")
+                        st.info("🔊 音声を生成しています...")
                         speak_text(ai_reply)
-                        st.success("✅ AI応答を音声で再生しています。")
+                        st.success("✅ 音声の準備ができました。上の音声プレーヤーから再生してください。")
                     except Exception as e:
-                        st.error(f"❌ 音声再生中にエラーが発生しました: {str(e)}")
+                        st.error(f"❌ 音声再生の準備中にエラーが発生しました: {str(e)}")
                         st.warning("音声は再生できませんでしたが、会話は継続できます。")
-                    
-                    st.rerun()  # 会話履歴を更新
                 except Exception as e:
                     st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
                     ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
