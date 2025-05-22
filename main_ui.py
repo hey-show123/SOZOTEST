@@ -304,21 +304,27 @@ if mode == "通常会話モード":
                         max_tokens=150
                     )
                     ai_reply = response.choices[0].message.content
+                    st.session_state.history.append(("AI（お客様）", ai_reply))
+                    st.success(f"AI（お客様）の返答: {ai_reply}")
+                    
+                    # AI応答を音声で再生
+                    try:
+                        st.info("🔊 音声を生成中...")
+                        speak_text(ai_reply)
+                        st.success("✅ AI応答を音声で再生しています。")
+                    except Exception as e:
+                        st.error(f"❌ 音声再生中にエラーが発生しました: {str(e)}")
+                        st.warning("音声は再生できませんでしたが、会話は継続できます。")
+                    
+                    st.rerun()  # 会話履歴を更新
                 except Exception as e:
                     st.error(f"AI応答の生成中にエラーが発生しました: {str(e)}")
                     ai_reply = "申し訳ありません。AI応答の生成に失敗しました。"
+                    st.session_state.history.append(("AI（お客様）", ai_reply))
             else:
                 st.error("OpenAI APIキーが設定されていません。")
                 ai_reply = "APIキーを設定してください。"
-            
-            st.session_state.history.append(("AI（お客様）", ai_reply))
-            # AI応答を音声で再生
-            try:
-                speak_text(ai_reply)
-                st.success("✅ AI応答を音声で再生しています。")
-            except Exception as e:
-                st.error(f"❌ 音声再生中にエラーが発生しました: {str(e)}")
-            st.rerun()
+                st.session_state.history.append(("AI（お客様）", ai_reply))
     else:
         # 音声入力
         def on_transcript(text):
