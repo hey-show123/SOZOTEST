@@ -68,46 +68,36 @@ class SessionState:
 
 def initialize_session_state():
     """セッション状態の初期化"""
-    if "session_state" not in st.session_state:
-        st.session_state.session_state = SessionState()
-    
-    # 既存の状態を新しい構造に移行
-    session = st.session_state.session_state
-    if not session.initialized:
-        # 既存の状態があれば移行
-        for key in ["conversation_history", "selected_voice", "play_audio", 
-                   "message_input", "dialog_progress", "waiting_for_input",
-                   "lesson_name", "key_phrase", "vocab_list", "extra_note",
-                   "dialog_lines"]:
-            if key in st.session_state:
-                setattr(session, key, st.session_state[key])
-                del st.session_state[key]
-        session.initialized = True
+    if "session" not in st.session_state:
+        st.session_state.session = SessionState()
+        st.session_state.audio_state = AudioState()
+        st.session_state.message = ""  # テキスト入力用の状態
+        st.session_state.mode = "通常会話モード"  # モード選択の状態
 
 def reset_conversation():
     """会話履歴のリセット"""
-    session = st.session_state.session_state
-    session.conversation_history = []
-    session.message_input = ""
-    session.play_audio = None
-    show_success("会話履歴をリセットしました。")
+    if "session" in st.session_state:
+        st.session_state.session.conversation_history = []
+        st.session_state.message = ""
+        st.session_state.session.play_audio = None
+        show_success("会話履歴をリセットしました。")
 
 def reset_dialog():
     """ダイアログ練習の状態リセット"""
-    session = st.session_state.session_state
-    session.dialog_lines = default_dialog()
-    session.dialog_progress = 0
-    session.waiting_for_input = False
-    show_success("ダイアログをリセットしました。")
+    if "session" in st.session_state:
+        st.session_state.session.dialog_lines = default_dialog()
+        st.session_state.session.dialog_progress = 0
+        st.session_state.session.waiting_for_input = False
+        show_success("ダイアログをリセットしました。")
 
 def update_lesson_settings(lesson_name, key_phrase, vocab_list, extra_note):
     """レッスン設定の更新"""
-    session = st.session_state.session_state
-    session.lesson_name = lesson_name
-    session.key_phrase = key_phrase
-    session.vocab_list = vocab_list
-    session.extra_note = extra_note
-    reset_conversation()
+    if "session" in st.session_state:
+        st.session_state.session.lesson_name = lesson_name
+        st.session_state.session.key_phrase = key_phrase
+        st.session_state.session.vocab_list = vocab_list
+        st.session_state.session.extra_note = extra_note
+        reset_conversation()
 
 # エラーメッセージのスタイル定義
 ERROR_STYLE = """
@@ -410,13 +400,13 @@ def render_input_method_selector():
 
 # セッション状態の初期化
 initialize_session_state()
-session = st.session_state.session_state
+session = st.session_state.session
 
 # メインタイトル
 st.title(f"{APP_TITLE} - {session.lesson_name} 復習")
 
 # モード選択
-mode = st.sidebar.radio("モード選択", ["通常会話モード", "ダイアログ練習モード"])
+mode = st.sidebar.radio("モード選択", ["通常会話モード", "ダイアログ練習モード"], key="mode")
 
 # サイドバーの設定
 with st.sidebar:
@@ -614,17 +604,17 @@ if mode == "通常会話モード":
         # テキスト入力UI
         col1, col2 = st.columns([5, 1])
         with col1:
-            user_input = st.text_input("", placeholder="メッセージを入力...", key="message_input")
+            user_input = st.text_input("", placeholder="メッセージを入力...", key="message")
         with col2:
             send_button = st.button("送信 💬")
         
         # 送信処理
-        if send_button and user_input.strip():
+        if send_button and st.session_state.message.strip():
             # 送信内容を一時保存
-            current_input = user_input
+            current_input = st.session_state.message
             
             # 入力欄をクリア
-            st.session_state.message_input = ""
+            st.session_state.message = ""
             
             # ユーザーの発言を会話履歴に追加
             session.conversation_history.append(("あなた（スタッフ）", current_input))
@@ -636,9 +626,7 @@ if mode == "通常会話モード":
                 session.conversation_history.append(("AI（お客様）", ai_reply))
                 
                 # 音声再生フラグを設定
-                if "play_audio" not in st.session_state:
-                    st.session_state.play_audio = None
-                st.session_state.play_audio = ai_reply
+                session.play_audio = ai_reply
             else:
                 show_error("AI応答の生成に失敗しました。もう一度お試しください。")
     else:
