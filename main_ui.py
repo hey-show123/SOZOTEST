@@ -482,11 +482,40 @@ def generate_system_prompt():
 - 特に重要なフレーズや表現を使用した際は、日本語で簡単な解説を加える
 """
 
-# --- 通常会話モード ---
+# テキスト入力処理の修正
+def handle_text_input():
+    """テキスト入力の処理を行う"""
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        # キーを使用してテキスト入力を作成
+        st.text_input("", placeholder="メッセージを入力...", key="input_message")
+    with col2:
+        send_button = st.button("送信 💬")
+    
+    # 送信処理
+    if send_button and st.session_state.input_message.strip():
+        current_input = st.session_state.input_message
+        
+        # ユーザーの発言を会話履歴に追加
+        st.session_state.session.conversation_history.append(("あなた（スタッフ）", current_input))
+        
+        # AI応答を生成
+        ai_reply = generate_ai_response(current_input, st.session_state.session.conversation_history[:-1])
+        if ai_reply:
+            # AIの応答を会話履歴に追加
+            st.session_state.session.conversation_history.append(("AI（お客様）", ai_reply))
+            st.session_state.session.play_audio = ai_reply
+        else:
+            show_error("AI応答の生成に失敗しました。もう一度お試しください。")
+        
+        # 入力欄をクリア（次回のrerunで反映される）
+        st.session_state.input_message = ""
+
+# 通常会話モードの処理
 if mode == "通常会話モード":
     # プロンプトの自動生成
     system_prompt = generate_system_prompt()
-
+    
     # カスタムCSS
     st.markdown("""
     <style>
@@ -557,16 +586,16 @@ if mode == "通常会話モード":
     }
     </style>
     """, unsafe_allow_html=True)
-
+    
     # 会話履歴表示
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
     # 会話が空の場合のメッセージ
-    if not session.conversation_history:
+    if not st.session_state.session.conversation_history:
         st.info("👋 会話を始めましょう！")
     
     # 会話履歴の表示
-    for i, (speaker, text) in enumerate(session.conversation_history):
+    for i, (speaker, text) in enumerate(st.session_state.session.conversation_history):
         if speaker == "あなた（スタッフ）":
             st.markdown(f"""
             <div class="message staff">
@@ -587,48 +616,22 @@ if mode == "通常会話モード":
             """, unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
-
+    
     # 音声の再生チェック
-    if "play_audio" in st.session_state and st.session_state.play_audio:
+    if st.session_state.session.play_audio:
         try:
-            if speak_text(st.session_state.play_audio):
-                st.session_state.play_audio = None  # 成功時のみフラグをクリア
+            if speak_text(st.session_state.session.play_audio):
+                st.session_state.session.play_audio = None
         except Exception as e:
             show_error(f"音声再生中にエラーが発生しました: {str(e)}")
-            st.session_state.play_audio = None  # エラー時もフラグをクリア
-
+            st.session_state.session.play_audio = None
+    
     # 入力方法の選択
     is_voice_input = render_input_method_selector()
     
     if not is_voice_input:
-        # テキスト入力UI
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            user_input = st.text_input("", placeholder="メッセージを入力...", key="message")
-        with col2:
-            send_button = st.button("送信 💬")
-        
-        # 送信処理
-        if send_button and st.session_state.message.strip():
-            # 送信内容を一時保存
-            current_input = st.session_state.message
-            
-            # 入力欄をクリア
-            st.session_state.message = ""
-            
-            # ユーザーの発言を会話履歴に追加
-            session.conversation_history.append(("あなた（スタッフ）", current_input))
-            
-            # AI応答を生成
-            ai_reply = generate_ai_response(current_input, session.conversation_history[:-1])
-            if ai_reply:
-                # AIの応答を会話履歴に追加
-                session.conversation_history.append(("AI（お客様）", ai_reply))
-                
-                # 音声再生フラグを設定
-                session.play_audio = ai_reply
-            else:
-                show_error("AI応答の生成に失敗しました。もう一度お試しください。")
+        # テキスト入力処理
+        handle_text_input()
     else:
         # 音声入力処理
         record_5sec_and_send(client, on_transcript)
