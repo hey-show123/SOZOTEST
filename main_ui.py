@@ -32,29 +32,24 @@ def speak_text(text):
     if not client:
         st.error("OpenAI APIキーが設定されていません。")
         return
-    
     try:
-        # セッションステートから選択された声を取得（デフォルトはalloy）
         selected_voice = st.session_state.get("selected_voice", "alloy")
-        
-        # OpenAI TTS APIを使用して音声を生成
         response = client.audio.speech.create(
             model="tts-1",
             voice=selected_voice,
             input=text
         )
-        
-        # 音声データを一時ファイルとして保存
+        # 一時ファイルに保存
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(response.content)
             temp_file = f.name
-        
-        # macOSの場合、afplayを使用して音声を再生
-        os.system(f"afplay {temp_file}")
-        
-        # 一時ファイルを削除
+        # ブラウザで再生用にbase64エンコード
+        with open(temp_file, "rb") as audio_file:
+            audio_bytes = audio_file.read()
+            b64 = base64.b64encode(audio_bytes).decode()
+            audio_html = f'<audio controls autoplay src="data:audio/mp3;base64,{b64}"></audio>'
+            st.markdown(audio_html, unsafe_allow_html=True)
         os.unlink(temp_file)
-        
     except Exception as e:
         st.error(f"音声合成中にエラーが発生しました: {str(e)}")
 
