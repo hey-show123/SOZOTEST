@@ -59,10 +59,11 @@ def speak_text(text):
             b64 = base64.b64encode(audio_bytes).decode()
             md_audio = f'''
             <div style="margin: 10px 0;">
-                <p style="margin-bottom: 5px;">🔊 音声を再生するには下のプレーヤーをクリックしてください：</p>
-                <audio controls src="data:audio/mp3;base64,{b64}">
+                <p style="margin-bottom: 5px;">🔊 音声を自動再生できない場合は、下のプレーヤーをクリックして再生してください：</p>
+                <audio controls autoplay src="data:audio/mp3;base64,{b64}">
                     お使いのブラウザは音声再生をサポートしていません。
                 </audio>
+                <p style="margin-top: 5px; font-size: 0.8em; color: #666;">※ブラウザの設定によっては自動再生が制限される場合があります。</p>
             </div>
             '''
             st.markdown(md_audio, unsafe_allow_html=True)
@@ -318,7 +319,7 @@ if mode == "通常会話モード":
                     try:
                         st.info("🔊 音声を生成しています...")
                         speak_text(ai_reply)
-                        st.success("✅ 音声の準備ができました。上の音声プレーヤーから再生してください。")
+                        st.success("✅ 音声の準備ができました。自動再生されない場合は、上の音声プレーヤーから再生してください。")
                     except Exception as e:
                         st.error(f"❌ 音声再生の準備中にエラーが発生しました: {str(e)}")
                         st.warning("音声は再生できませんでしたが、会話は継続できます。")
