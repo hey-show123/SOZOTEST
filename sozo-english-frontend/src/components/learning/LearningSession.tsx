@@ -28,6 +28,7 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, pdfFilena
   const [isRecording, setIsRecording] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [phaseChangeDetected, setPhaseChangeDetected] = useState(false);
 
   // メッセージ表示エリアへの自動スクロール
   useEffect(() => {
@@ -61,6 +62,19 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, pdfFilena
     }
   };
 
+  // AIの応答を解析してフェーズ変更のキーワードを検出
+  const detectPhaseChangeInMessage = (message: string) => {
+    const phaseChangeKeywords = [
+      "次のフェーズに進みましょう",
+      "次のステップに進みましょう",
+      "ダイアログ練習に移りましょう",
+      "単語練習に移りましょう",
+      "質問タイムに移りましょう"
+    ];
+    
+    return phaseChangeKeywords.some(keyword => message.includes(keyword));
+  };
+
   // メッセージ送信
   const sendMessage = async () => {
     if (!inputText.trim()) return;
@@ -80,18 +94,25 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, pdfFilena
       // AIの応答を取得
       const response = await lessonService.sendMessage(
         messageText,
-        updatedMessages,
+        updatedMessages, // 全会話履歴を確実に送信
         currentPhase,
         true
       );
       
       // AIの応答をメッセージリストに追加
       const aiMessage = { role: 'assistant', content: response.message };
-      setMessages([...updatedMessages, aiMessage]);
+      const newUpdatedMessages = [...updatedMessages, aiMessage];
+      setMessages(newUpdatedMessages);
       setVisibleMessages([...visibleMessages, userMessage, aiMessage]);
       
-      // フェーズを更新
-      setCurrentPhase(response.phase);
+      // フェーズ変更の検出
+      const shouldChangePhase = detectPhaseChangeInMessage(response.message);
+      if (shouldChangePhase || response.phase > currentPhase) {
+        setPhaseChangeDetected(true);
+        setCurrentPhase(response.phase || currentPhase + 1);
+      } else {
+        setCurrentPhase(response.phase || currentPhase);
+      }
       
       // 音声を再生
       if (response.audio) {

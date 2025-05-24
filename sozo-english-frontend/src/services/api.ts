@@ -53,12 +53,25 @@ export const lessonService = {
   // チャット
   sendMessage: async (message: string, conversationHistory: any[], phase: number = 1, audioFeedback: boolean = true) => {
     try {
+      // 会話履歴のフォーマットを確認
+      const formattedHistory = conversationHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
       const response = await apiClient.post('/lesson/chat', {
         message,
-        conversation_history: conversationHistory,
+        conversation_history: formattedHistory,
         phase,
         audio_feedback: audioFeedback
       });
+      
+      // レスポンスデータに適切なフェーズ情報が含まれているか確認
+      if (response.data && typeof response.data.phase === 'undefined') {
+        // フェーズ情報がない場合は、現在のフェーズを維持
+        response.data.phase = phase;
+      }
+      
       return response.data;
     } catch (error) {
       console.error('メッセージ送信エラー:', error);

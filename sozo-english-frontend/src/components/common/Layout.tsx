@@ -54,12 +54,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </NavButton>
           </Link>
           
-          <Link href="/pdfs" passHref style={{ textDecoration: 'none' }}>
-            <NavButton active={currentPath === '/pdfs'}>
-              PDF教材
-            </NavButton>
-          </Link>
-          
         </Toolbar>
       </StyledAppBar>
       <Container component="main" maxWidth="lg">
