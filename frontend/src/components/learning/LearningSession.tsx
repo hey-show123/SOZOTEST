@@ -119,9 +119,9 @@ const LearningSession: React.FC<LearningSessionProps> = ({
     setWaitingForUserInput(false);
     
     try {
-      // 会話履歴からAI用のメッセージ形式に変換（最新の5つのメッセージのみ）
-      const recentMessages = updatedConversation
-        .slice(-5) // 最新5件のメッセージのみを使用
+      // 会話履歴からAI用のメッセージ形式に変換（すべての会話履歴を使用）
+      const conversationMessages = updatedConversation
+        // すべての会話履歴を使用
         .map(msg => ({
           role: msg.role,
           content: msg.content
@@ -132,7 +132,7 @@ const LearningSession: React.FC<LearningSessionProps> = ({
         lesson.id,
         input,
         phase,
-        recentMessages // 会話履歴を追加
+        conversationMessages // 完全な会話履歴を追加
       );
       
       if (response.error) {
@@ -225,11 +225,11 @@ const LearningSession: React.FC<LearningSessionProps> = ({
   const checkPhaseTransition = useCallback((text: string, currentPhase: SessionPhase) => {
     // 各フェーズの完了を示す特定のフレーズをチェック
     const phaseTransitionPhrases = {
-      [SessionPhase.GREETING]: ['発音が素晴らしいです', '次のフェーズに進みましょう', '良い発音です'],
-      [SessionPhase.PHRASE_PRACTICE]: ['発音が素晴らしいです', '次のフェーズに進みましょう', '良い発音です', 'ダイアログ練習を始めましょう'],
-      [SessionPhase.DIALOGUE_PRACTICE]: ['ダイアログ練習が完了しました', '次のフェーズに進みましょう', '語彙練習に進みましょう'],
-      [SessionPhase.VOCABULARY_PRACTICE]: ['語彙練習が完了しました', '次のフェーズに進みましょう', '質問タイムに進みましょう'],
-      [SessionPhase.QUESTION_TIME]: ['質問タイムが終了しました', 'レッスンを完了しましょう', '時間になりました'],
+      [SessionPhase.GREETING]: ['発音が素晴らしいです！次のフェーズに進みましょう', '次のフェーズに進みましょう', '良い発音です！次のステップに進みます'],
+      [SessionPhase.PHRASE_PRACTICE]: ['次のフェーズに進みましょう', 'ダイアログ練習を始めましょう', '素晴らしい発音です！ダイアログ練習に進みます'],
+      [SessionPhase.DIALOGUE_PRACTICE]: ['ダイアログ練習が完了しました。次のフェーズに進みましょう', '語彙練習に進みましょう', 'ダイアログのセクションが終わりました'],
+      [SessionPhase.VOCABULARY_PRACTICE]: ['語彙練習が完了しました。次のフェーズに進みましょう', '質問タイムに進みましょう', '単語の練習が終わりました'],
+      [SessionPhase.QUESTION_TIME]: ['質問タイムが終了しました。レッスンを完了しましょう', '時間になりました。レッスンを終了します', 'レッスンの最終セクションが完了しました'],
       [SessionPhase.COMPLETED]: ['レッスンが完了しました', 'お疲れ様でした'],
     };
 

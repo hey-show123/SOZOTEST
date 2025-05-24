@@ -37,7 +37,16 @@ export default async function handler(
     
     // 会話履歴があれば追加
     if (conversationHistory && conversationHistory.length > 0) {
-      messages.push(...conversationHistory);
+      // 会話履歴の追加 (conversationHistoryはすでに正しいrole/contentフォーマットで渡されている)
+      conversationHistory.forEach(msg => {
+        messages.push(msg);
+      });
+      
+      // 最後に現在のメッセージを追加（まだ追加されていない場合）
+      const lastMessage = conversationHistory[conversationHistory.length - 1];
+      if (lastMessage.role !== 'user' || lastMessage.content !== message) {
+        messages.push({ role: 'user', content: message });
+      }
     } else {
       // 履歴がない場合は単一のユーザーメッセージを追加
       messages.push({ role: 'user', content: message });
