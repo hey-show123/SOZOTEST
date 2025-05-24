@@ -137,13 +137,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
       </div>
       
       <div className="pdf-document-container">
-        {isLoading && (
-          <div className="pdf-loading">
-            <div className="spinner"></div>
-            <p>PDFを読み込み中...<br/>しばらくお待ちください</p>
-          </div>
-        )}
-        
         {error && (
           <div className="pdf-error">
             <p>{error}</p>
@@ -153,12 +146,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
             >
               再読み込み
             </button>
-            <p className="text-sm mt-2">
-              {retryCount >= 3 ? 
-                'PDFの読み込みに繰り返し失敗しています。別のブラウザやデバイスでお試しください。' : 
-                `自動的に再試行しています (${retryCount}/3)...`
-              }
-            </p>
           </div>
         )}
         
@@ -166,7 +153,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
           file={pdfUrlWithTimestamp()}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
-          loading={<div className="pdf-loading"><div className="spinner"></div></div>}
+          loading={<></>}
           className="pdf-document"
           options={{
             cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/cmaps/',
@@ -174,7 +161,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
             standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/standard_fonts/'
           }}
         >
-          {!isLoading && !error && (
+          {!error && (
             <Page 
               pageNumber={pageNumber}
               scale={scale}
@@ -249,9 +236,8 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
           padding: 16px;
           display: flex;
           justify-content: center;
+          align-items: center;
           position: relative;
-          -webkit-overflow-scrolling: touch;
-          background-color: #f8f9fa;
         }
         
         .pdf-document {
@@ -266,43 +252,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ pdfUrl }) => {
           border-radius: 2px;
         }
         
-        .pdf-loading {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 200px;
-          width: 100%;
-          text-align: center;
-        }
-        
-        .spinner {
-          border: 4px solid rgba(0, 0, 0, 0.1);
-          border-radius: 50%;
-          border-top: 4px solid #4F46E5;
-          width: 40px;
-          height: 40px;
-          animation: spin 1s linear infinite;
-          margin-bottom: 16px;
-        }
-        
         .pdf-error {
-          text-align: center;
+          padding: 20px;
+          border-radius: 8px;
+          background-color: #fee2e2;
           color: #ef4444;
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        
-        .pdf-error .pdf-button {
-          margin-top: 16px;
-          background-color: #ef4444;
-        }
-        
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+          text-align: center;
+          width: 100%;
+          max-width: 400px;
+          margin: 0 auto;
         }
       `}</style>
     </div>
