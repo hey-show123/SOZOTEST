@@ -253,10 +253,36 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
   // 音声の再生
   const playAudio = (base64Audio: string) => {
     try {
+      console.log('音声再生開始:', base64Audio?.substring(0, 20) + '...');
+      
+      // base64Audioがnullまたは空文字の場合は処理をスキップ
+      if (!base64Audio) {
+        console.warn('音声データがありません');
+        return;
+      }
+      
       const audioSrc = `data:audio/mp3;base64,${base64Audio}`;
       const audio = new Audio(audioSrc);
+      
+      // 再生開始イベント
+      audio.onplay = () => {
+        console.log('音声再生中...');
+      };
+      
+      // 再生終了イベント
+      audio.onended = () => {
+        console.log('音声再生完了');
+      };
+      
+      // エラーイベント
+      audio.onerror = (e) => {
+        console.error('音声再生エラー:', e);
+      };
+      
       // 再生速度を調整（0.9倍速に変更、バックエンドとの互換性を考慮）
       audio.playbackRate = 0.9;
+      
+      // 音声再生
       audio.play().catch(error => {
         console.error('音声再生エラー:', error);
       });

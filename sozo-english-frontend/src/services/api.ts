@@ -68,7 +68,8 @@ const mockAPI = {
     return {
       message: "こんにちは！英会話レッスンへようこそ。今日は簡単なフレーズから始めましょう。今日のキーフレーズは「Would you like to do a treatment as well?」（トリートメントもいかがですか？）です。このフレーズは美容院などで追加のサービスを提案するときによく使われます。まずは私の後に続いて発音してみてください。",
       phase: 1,
-      audio: null // 実際にはBase64エンコードされた音声データが入る
+      // ダミーの音声データ（実際は長い文字列）
+      audio: "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAAFegCampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqam"
     };
   },
   
@@ -78,7 +79,8 @@ const mockAPI = {
     let response = {
       message: "",
       phase: phase,
-      audio: null
+      // ダミーの音声データ（実際は長い文字列）
+      audio: "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAAFegCampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqampqam"
     };
     
     // フェーズ1でのキーフレーズ練習
@@ -90,15 +92,24 @@ const mockAPI = {
       
       // キーフレーズを3回練習したらフェーズ2へ
       if (repeatCount >= 2) {
-        response.message = "素晴らしいです！発音も良いですね。キーフレーズの練習は十分です。次はダイアログ練習に移りましょう。美容院でのシナリオを想定して会話をしてみましょう。私が美容師役、あなたがお客様役です。私から始めますね。";
+        response.message = "素晴らしいです！発音も良いですね。キーフレーズの練習は十分です。次はダイアログ練習に移りましょう。美容院でのシナリオを想定して会話をしてみましょう。あなたが美容師役（スタッフ役）、私がお客様役です。まずはあなたから「いらっしゃいませ」と声をかけてください。";
         response.phase = 2;
       } else {
         response.message = "良くできました！「Would you like to do a treatment as well?」の発音がとても良いですね。もう一度練習してみましょう。";
       }
     }
-    // フェーズ2でのダイアログ練習
+    // フェーズ2でのダイアログ練習（ユーザーがスタッフ役）
     else if (phase === 2) {
-      response.message = "はい、お客様。カットは終わりました。とても似合っていますよ。Would you like to do a treatment as well? 髪の毛に栄養を与えるトリートメントもご用意しています。";
+      // ユーザーのメッセージに基づいて応答を変える
+      if (message.toLowerCase().includes('いらっしゃいませ') || message.toLowerCase().includes('welcome')) {
+        response.message = "こんにちは。今日は髪を切りたいのですが、お願いできますか？";
+      } else if (message.toLowerCase().includes('would you like')) {
+        response.message = "はい、トリートメントもお願いします。料金はいくらですか？";
+      } else if (message.toLowerCase().includes('cut') || message.toLowerCase().includes('カット')) {
+        response.message = "ありがとうございます。とても素敵になりました。";
+      } else {
+        response.message = "すみません、よく分かりませんでした。美容師としてカットの後に「Would you like to do a treatment as well?」と追加サービスを提案してみてください。";
+      }
     }
     
     return response;
