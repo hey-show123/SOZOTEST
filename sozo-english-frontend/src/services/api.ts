@@ -29,10 +29,8 @@ export const lessonService = {
   // レッスン開始
   startLesson: async () => {
     try {
-      const response = await apiClient.post('/lesson/start', {
-        initial_phase: 1, // 明示的にフェーズ1から開始
-        include_phase_info: true // フェーズ情報を含めるよう指定
-      });
+      // バックエンドとの互換性のため、シンプルなリクエストに戻す
+      const response = await apiClient.post('/lesson/start', {});
       return response.data;
     } catch (error) {
       console.error('レッスン開始エラー:', error);
@@ -53,17 +51,14 @@ export const lessonService = {
       const isPhaseTransitionRequest = 
         message.includes('次のフェーズ') || 
         message.includes('次のステップ') || 
-        message.includes('ダイアログ練習') ||
-        phase > 1; // フェーズ2以降の場合、明示的にそのフェーズで処理
+        message.includes('ダイアログ練習');
       
+      // バックエンドとの互換性のため、基本的なパラメータのみを送信
       const response = await apiClient.post('/lesson/chat', {
         message,
         conversation_history: formattedHistory,
         phase,
-        audio_feedback: audioFeedback,
-        speech_speed: 0.8, // 英語の読み上げ速度を0.8倍に設定
-        include_phase_info: true, // フェーズ情報を含めるよう指定
-        force_phase_transition: isPhaseTransitionRequest // フェーズ移行を強制する場合
+        audio_feedback: audioFeedback
       });
       
       // レスポンスデータに適切なフェーズ情報が含まれているか確認
@@ -105,8 +100,7 @@ export const lessonService = {
     try {
       const response = await apiClient.post('/text-to-speech', {
         text,
-        voice,
-        speed: 0.8 // 音声の速度を0.8倍に設定
+        voice
       });
       return response.data;
     } catch (error) {

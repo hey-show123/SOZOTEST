@@ -239,8 +239,8 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
     try {
       const audioSrc = `data:audio/mp3;base64,${base64Audio}`;
       const audio = new Audio(audioSrc);
-      // 再生速度を遅くする（0.8倍速）
-      audio.playbackRate = 0.8;
+      // 再生速度を調整（0.9倍速に変更、バックエンドとの互換性を考慮）
+      audio.playbackRate = 0.9;
       audio.play().catch(error => {
         console.error('音声再生エラー:', error);
       });
