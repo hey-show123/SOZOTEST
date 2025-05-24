@@ -284,12 +284,6 @@ const LearningSession: React.FC<LearningSessionProps> = ({
     // 録音中の場合は停止
     if (isListening || isProcessing) {
       stopListening();
-      // 処理中だった場合は少し待ってからsetIsProcessingをfalseに
-      if (isProcessing) {
-        setTimeout(() => {
-          setIsProcessing(false);
-        }, 500);
-      }
     } else {
       // それ以外の場合は録音開始（音声再生中でも可能に）
       if (isPlaying) {

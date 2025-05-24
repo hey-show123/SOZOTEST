@@ -287,7 +287,7 @@ export function useSpeechRecognition() {
       setIsListening(false);
       cleanupStream();
     }
-  }, [permissionGranted, checkMicrophonePermission, cleanupStream, restartRecording, stopListening]);
+  }, [permissionGranted, checkMicrophonePermission, cleanupStream, restartRecording]);
   
   // 音声認識停止
   const stopListening = useCallback(() => {
