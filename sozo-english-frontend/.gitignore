@@ -31,3 +31,4 @@ out/
   .venv/
   google-cloud-sdk/
   *.tar.gz
+.vercel
