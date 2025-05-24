@@ -24,25 +24,12 @@ export interface ProgressData {
   weaknesses: string[];
 }
 
-export interface PDFMetadata {
-  filename: string;
-  title: string;
-  description?: string;
-  lesson_id?: string;
-  tags: string[];
-  uploaded_at: string;
-  size_bytes: number;
-  url?: string;
-}
-
 // レッスン関連のAPIサービス
 export const lessonService = {
   // レッスン開始
-  startLesson: async (pdfFilename?: string) => {
+  startLesson: async () => {
     try {
-      const response = await apiClient.post('/lesson/start', {
-        pdf_filename: pdfFilename
-      });
+      const response = await apiClient.post('/lesson/start', {});
       return response.data;
     } catch (error) {
       console.error('レッスン開始エラー:', error);
@@ -63,7 +50,8 @@ export const lessonService = {
         message,
         conversation_history: formattedHistory,
         phase,
-        audio_feedback: audioFeedback
+        audio_feedback: audioFeedback,
+        speech_speed: 0.8 // 英語の読み上げ速度を0.8倍に設定
       });
       
       // レスポンスデータに適切なフェーズ情報が含まれているか確認
@@ -104,71 +92,17 @@ export const lessonService = {
     try {
       const response = await apiClient.post('/text-to-speech', {
         text,
-        voice
+        voice,
+        speed: 0.8 // 音声の速度を0.8倍に設定
       });
       return response.data;
     } catch (error) {
       console.error('音声合成エラー:', error);
       throw error;
     }
-  },
-
-  // PDFの取得URL
-  getPdfUrl: (filename: string) => {
-    return `${apiClient.defaults.baseURL}/lesson/pdf/${filename}`;
-  }
-};
-
-// PDF管理APIサービス
-export const pdfService = {
-  // PDFファイル一覧の取得
-  getAllPdfs: async () => {
-    try {
-      const response = await apiClient.get('/lesson/pdf');
-      return response.data;
-    } catch (error) {
-      console.error('PDF一覧取得エラー:', error);
-      throw error;
-    }
-  },
-  
-  // PDFファイルのアップロード
-  uploadPdf: async (file: File) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await apiClient.post('/lesson/pdf', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      return response.data;
-    } catch (error) {
-      console.error('PDFアップロードエラー:', error);
-      throw error;
-    }
-  },
-  
-  // PDFファイルの削除
-  deletePdf: async (filename: string) => {
-    try {
-      const response = await apiClient.delete(`/lesson/pdf/${filename}`);
-      return response.data;
-    } catch (error) {
-      console.error('PDF削除エラー:', error);
-      throw error;
-    }
-  },
-
-  // PDFの取得URL
-  getPdfUrl: (filename: string) => {
-    return `${apiClient.defaults.baseURL}/lesson/pdf/${filename}`;
   }
 };
 
 export default {
-  lesson: lessonService,
-  pdf: pdfService,
+  lesson: lessonService
 }; 

@@ -13,11 +13,10 @@ interface Message {
 
 interface LearningSessionProps {
   scenarioId: string;
-  pdfFilename?: string;
   onComplete?: (data: { duration: number; turns: number; accuracy: number }) => void;
 }
 
-const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, pdfFilename, onComplete }) => {
+const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplete }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [visibleMessages, setVisibleMessages] = useState<{role: string; content: string}[]>([]);
   const [inputText, setInputText] = useState('');
@@ -41,7 +40,7 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, pdfFilena
   const startSession = async () => {
     try {
       setIsLoading(true);
-      const response = await lessonService.startLesson(pdfFilename);
+      const response = await lessonService.startLesson();
       
       const newMessage = { 
         role: 'assistant', 
@@ -170,6 +169,8 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, pdfFilena
     try {
       const audioSrc = `data:audio/mp3;base64,${base64Audio}`;
       const audio = new Audio(audioSrc);
+      // 再生速度を遅くする（0.8倍速）
+      audio.playbackRate = 0.8;
       audio.play().catch(error => {
         console.error('音声再生エラー:', error);
       });
