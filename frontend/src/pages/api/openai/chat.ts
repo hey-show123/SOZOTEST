@@ -38,7 +38,7 @@ export default async function handler(
     // 会話履歴があれば追加
     if (conversationHistory && conversationHistory.length > 0) {
       // 会話履歴の追加 (conversationHistoryはすでに正しいrole/contentフォーマットで渡されている)
-      conversationHistory.forEach(msg => {
+      conversationHistory.forEach((msg: { role: string; content: string }) => {
         messages.push(msg);
       });
       
