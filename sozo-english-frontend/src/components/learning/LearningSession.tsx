@@ -28,6 +28,8 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
   const [startTime, setStartTime] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [phaseChangeDetected, setPhaseChangeDetected] = useState(false);
+  const [phraseRepeatCount, setPhraseRepeatCount] = useState(0);
+  const maxPhraseRepeatCount = 3; // キーフレーズを3回練習したらフェーズ2へ移行
 
   // メッセージ表示エリアへの自動スクロール
   useEffect(() => {
@@ -68,10 +70,39 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
       "次のステップに進みましょう",
       "ダイアログ練習に移りましょう",
       "単語練習に移りましょう",
-      "質問タイムに移りましょう"
+      "質問タイムに移りましょう",
+      "次は会話の練習をしましょう",
+      "次のダイアログ練習に進みましょう",
+      "会話練習に移りましょう",
+      "では次のステップに進みます",
+      "ダイアログの練習を始めましょう"
     ];
     
     return phaseChangeKeywords.some(keyword => message.includes(keyword));
+  };
+
+  // ユーザーの発言がキーフレーズの練習かを検出
+  const isKeyPhraseRepetition = (userMessage: string, aiResponse: string) => {
+    // キーフレーズ練習フェーズ（フェーズ1）の場合のみチェック
+    if (currentPhase !== 1) return false;
+    
+    // AIの応答に「よく言えました」「発音が良いです」などの評価フレーズが含まれるか
+    const positiveFeedbackKeywords = [
+      "よく言えました",
+      "発音が良いです",
+      "素晴らしいです",
+      "上手です",
+      "よくできました",
+      "正確です",
+      "完璧です",
+      "Great",
+      "Perfect",
+      "Well done",
+      "Very good"
+    ];
+    
+    // AIの応答に評価フレーズが含まれていれば、キーフレーズの練習と判断
+    return positiveFeedbackKeywords.some(keyword => aiResponse.includes(keyword));
   };
 
   // メッセージ送信
@@ -104,11 +135,50 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
       setMessages(newUpdatedMessages);
       setVisibleMessages([...visibleMessages, userMessage, aiMessage]);
       
+      // フェーズ1でのキーフレーズ練習回数をカウント
+      if (currentPhase === 1 && isKeyPhraseRepetition(messageText, response.message)) {
+        const newCount = phraseRepeatCount + 1;
+        setPhraseRepeatCount(newCount);
+        
+        // キーフレーズを一定回数練習したらフェーズ2へ自動移行
+        if (newCount >= maxPhraseRepeatCount) {
+          setCurrentPhase(2);
+          // フェーズ移行メッセージを追加
+          const phaseChangeMessage = {
+            role: 'assistant',
+            content: 'キーフレーズの練習が完了しました。次はダイアログ練習に進みましょう。'
+          };
+          setMessages([...newUpdatedMessages, phaseChangeMessage]);
+          setVisibleMessages([...visibleMessages, userMessage, aiMessage, phaseChangeMessage]);
+          
+          // フェーズ2開始のAPIリクエスト
+          try {
+            const phaseChangeResponse = await lessonService.sendMessage(
+              "次のフェーズに進みましょう",
+              [...newUpdatedMessages, phaseChangeMessage],
+              2, // フェーズ2を指定
+              true
+            );
+            
+            if (phaseChangeResponse.audio) {
+              setAudioData(phaseChangeResponse.audio);
+              playAudio(phaseChangeResponse.audio);
+            }
+          } catch (error) {
+            console.error('フェーズ変更エラー:', error);
+          }
+          
+          return; // 以降の処理をスキップ
+        }
+      }
+      
       // フェーズ変更の検出
       const shouldChangePhase = detectPhaseChangeInMessage(response.message);
       if (shouldChangePhase || response.phase > currentPhase) {
         setPhaseChangeDetected(true);
         setCurrentPhase(response.phase || currentPhase + 1);
+        // フェーズが変わったらカウントをリセット
+        setPhraseRepeatCount(0);
       } else {
         setCurrentPhase(response.phase || currentPhase);
       }
@@ -203,9 +273,8 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
   const getPhaseLabel = (phase: number) => {
     const phases = [
       '準備',
-      'あいさつ',
-      'フレーズ練習',
-      'ダイアログ',
+      'キーフレーズ練習',
+      'ダイアログ練習',
       '単語練習',
       '質問タイム'
     ];
@@ -218,6 +287,11 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="subtitle1">
             現在のフェーズ: {getPhaseLabel(currentPhase)}
+            {currentPhase === 1 && (
+              <span style={{ marginLeft: '10px', fontSize: '0.8em', color: '#666' }}>
+                (練習回数: {phraseRepeatCount}/{maxPhraseRepeatCount})
+              </span>
+            )}
           </Typography>
           <IconButton 
             onClick={replayLastAudio} 

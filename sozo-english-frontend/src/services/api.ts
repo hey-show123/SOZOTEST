@@ -29,7 +29,10 @@ export const lessonService = {
   // レッスン開始
   startLesson: async () => {
     try {
-      const response = await apiClient.post('/lesson/start', {});
+      const response = await apiClient.post('/lesson/start', {
+        initial_phase: 1, // 明示的にフェーズ1から開始
+        include_phase_info: true // フェーズ情報を含めるよう指定
+      });
       return response.data;
     } catch (error) {
       console.error('レッスン開始エラー:', error);
@@ -46,18 +49,28 @@ export const lessonService = {
         content: msg.content
       }));
       
+      // フェーズ移行の明示的なシグナルを検出
+      const isPhaseTransitionRequest = 
+        message.includes('次のフェーズ') || 
+        message.includes('次のステップ') || 
+        message.includes('ダイアログ練習') ||
+        phase > 1; // フェーズ2以降の場合、明示的にそのフェーズで処理
+      
       const response = await apiClient.post('/lesson/chat', {
         message,
         conversation_history: formattedHistory,
         phase,
         audio_feedback: audioFeedback,
-        speech_speed: 0.8 // 英語の読み上げ速度を0.8倍に設定
+        speech_speed: 0.8, // 英語の読み上げ速度を0.8倍に設定
+        include_phase_info: true, // フェーズ情報を含めるよう指定
+        force_phase_transition: isPhaseTransitionRequest // フェーズ移行を強制する場合
       });
       
       // レスポンスデータに適切なフェーズ情報が含まれているか確認
       if (response.data && typeof response.data.phase === 'undefined') {
         // フェーズ情報がない場合は、現在のフェーズを維持
-        response.data.phase = phase;
+        // ただし、フェーズ移行リクエストの場合は次のフェーズに進める
+        response.data.phase = isPhaseTransitionRequest ? phase + 1 : phase;
       }
       
       return response.data;
