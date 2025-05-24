@@ -42,7 +42,18 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
   const startSession = async () => {
     try {
       setIsLoading(true);
+      console.log('レッスン開始リクエスト送信...');
+      
       const response = await lessonService.startLesson();
+      console.log('レッスン開始レスポンス:', response);
+      
+      // レスポンスの形式を確認
+      if (!response || !response.message) {
+        console.error('レスポンスにmessageプロパティがありません:', response);
+        alert('レッスンの開始に失敗しました。後ほど再度お試しください。');
+        setIsLoading(false);
+        return;
+      }
       
       const newMessage = { 
         role: 'assistant', 
@@ -51,13 +62,18 @@ const LearningSession: React.FC<LearningSessionProps> = ({ scenarioId, onComplet
       
       setMessages([newMessage]);
       setVisibleMessages([newMessage]);
-      setCurrentPhase(response.phase);
-      setAudioData(response.audio);
+      setCurrentPhase(response.phase || 1);
+      if (response.audio) {
+        setAudioData(response.audio);
+        playAudio(response.audio);
+      } else {
+        console.warn('音声データがありません');
+      }
       setSessionStarted(true);
       setStartTime(Date.now());
-      playAudio(response.audio);
     } catch (error) {
       console.error('セッション開始エラー:', error);
+      alert('レッスンの開始に失敗しました。後ほど再度お試しください。');
     } finally {
       setIsLoading(false);
     }

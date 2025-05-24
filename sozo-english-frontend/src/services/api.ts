@@ -1,12 +1,46 @@
 import axios from 'axios';
 
+// API通信のタイムアウト設定（30秒）
+const TIMEOUT_MS = 30000;
+
+// バックエンドAPIのURL
+const API_BASE_URL = 'https://backend-462027224254.asia-northeast1.run.app/api';
+
 // APIクライアントの設定
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://backend-462027224254.asia-northeast1.run.app/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || API_BASE_URL,
   headers: {
     'Content-type': 'application/json',
   },
+  timeout: TIMEOUT_MS, // タイムアウト設定
 });
+
+// APIリクエストの詳細をログ出力
+apiClient.interceptors.request.use(
+  config => {
+    console.log(`APIリクエスト: ${config.method?.toUpperCase()} ${config.url}`, config.data);
+    return config;
+  },
+  error => {
+    console.error('APIリクエストエラー:', error);
+    return Promise.reject(error);
+  }
+);
+
+// APIレスポンスの詳細をログ出力
+apiClient.interceptors.response.use(
+  response => {
+    console.log(`APIレスポンス: ${response.status} ${response.config.url}`, response.data);
+    return response;
+  },
+  error => {
+    console.error('APIレスポンスエラー:', 
+      error.response ? `${error.response.status} ${error.config?.url}` : error.message,
+      error.response?.data
+    );
+    return Promise.reject(error);
+  }
+);
 
 export interface SessionData {
   duration: number;
@@ -31,9 +65,24 @@ export const lessonService = {
     try {
       // バックエンドとの互換性のため、シンプルなリクエストに戻す
       const response = await apiClient.post('/lesson/start', {});
+      
+      // レスポンス形式を検証
+      if (!response.data || typeof response.data !== 'object') {
+        console.error('無効なレスポンス形式:', response.data);
+        throw new Error('無効なレスポンス形式');
+      }
+      
       return response.data;
     } catch (error) {
       console.error('レッスン開始エラー:', error);
+      // エラー情報を詳細に記録
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          console.error('サーバーレスポンス:', error.response.status, error.response.data);
+        } else if (error.request) {
+          console.error('レスポンスなし (タイムアウトなど):', error.request);
+        }
+      }
       throw error;
     }
   },
@@ -71,6 +120,14 @@ export const lessonService = {
       return response.data;
     } catch (error) {
       console.error('メッセージ送信エラー:', error);
+      // エラー情報を詳細に記録
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          console.error('サーバーレスポンス:', error.response.status, error.response.data);
+        } else if (error.request) {
+          console.error('レスポンスなし (タイムアウトなど):', error.request);
+        }
+      }
       throw error;
     }
   },
