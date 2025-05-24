@@ -1,6 +1,7 @@
 {
   "name": "sozo-english-frontend",
   "version": 2,
+  "public": true,
   "builds": [
     {
       "src": "package.json",
@@ -10,7 +11,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "https://api.sozo-english.com/api/$1"
+      "dest": "/api/$1"
     },
     {
       "src": "/(.*)",
@@ -19,5 +20,9 @@
   ],
   "env": {
     "NEXT_PUBLIC_API_URL": "https://api.sozo-english.com"
+  },
+  "github": {
+    "enabled": true,
+    "silent": true
   }
 } 
