@@ -281,9 +281,22 @@ const LearningSession: React.FC<LearningSessionProps> = ({
       return;
     }
     
-    if (isListening) {
+    // 録音中の場合は停止
+    if (isListening || isProcessing) {
       stopListening();
-    } else if (waitingForUserInput && !isPlaying && !isProcessing) {
+      // 処理中だった場合は少し待ってからsetIsProcessingをfalseに
+      if (isProcessing) {
+        setTimeout(() => {
+          setIsProcessing(false);
+        }, 500);
+      }
+    } else {
+      // それ以外の場合は録音開始（音声再生中でも可能に）
+      if (isPlaying) {
+        console.log('Attempted to start recording while audio is playing');
+      }
+      
+      // どんな状態でも録音を開始できるように
       startListening();
     }
   };
@@ -394,7 +407,7 @@ const LearningSession: React.FC<LearningSessionProps> = ({
         <button 
           className={micButtonClass}
           onClick={handleMicrophoneClick}
-          disabled={isPlaying || isAudioLoading || isProcessing || (isSessionStarted && !waitingForUserInput) || phase === SessionPhase.COMPLETED}
+          disabled={phase === SessionPhase.COMPLETED}
         >
           {micButtonText}
         </button>
