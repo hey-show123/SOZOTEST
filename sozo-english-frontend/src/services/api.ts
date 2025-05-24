@@ -6,6 +6,9 @@ const TIMEOUT_MS = 30000;
 // バックエンドAPIのURL
 const API_BASE_URL = 'https://backend-462027224254.asia-northeast1.run.app/api';
 
+// モックAPIを使用するかどうか
+const USE_MOCK_API = true;
+
 // APIクライアントの設定
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || API_BASE_URL,
@@ -58,10 +61,60 @@ export interface ProgressData {
   weaknesses: string[];
 }
 
+// モックレスポンスの生成
+const mockAPI = {
+  // レッスン開始モック
+  startLesson: () => {
+    return {
+      message: "こんにちは！英会話レッスンへようこそ。今日は簡単なフレーズから始めましょう。今日のキーフレーズは「Would you like to do a treatment as well?」（トリートメントもいかがですか？）です。このフレーズは美容院などで追加のサービスを提案するときによく使われます。まずは私の後に続いて発音してみてください。",
+      phase: 1,
+      audio: null // 実際にはBase64エンコードされた音声データが入る
+    };
+  },
+  
+  // チャットモック
+  sendMessage: (message: string, history: Array<{role: string; content: string}>, phase: number) => {
+    // ユーザーのメッセージに基づいてレスポンスを生成
+    let response = {
+      message: "",
+      phase: phase,
+      audio: null
+    };
+    
+    // フェーズ1でのキーフレーズ練習
+    if (phase === 1) {
+      const repeatCount = history.filter(msg => 
+        msg.role === 'user' && 
+        msg.content.toLowerCase().includes('would you like')
+      ).length;
+      
+      // キーフレーズを3回練習したらフェーズ2へ
+      if (repeatCount >= 2) {
+        response.message = "素晴らしいです！発音も良いですね。キーフレーズの練習は十分です。次はダイアログ練習に移りましょう。美容院でのシナリオを想定して会話をしてみましょう。私が美容師役、あなたがお客様役です。私から始めますね。";
+        response.phase = 2;
+      } else {
+        response.message = "良くできました！「Would you like to do a treatment as well?」の発音がとても良いですね。もう一度練習してみましょう。";
+      }
+    }
+    // フェーズ2でのダイアログ練習
+    else if (phase === 2) {
+      response.message = "はい、お客様。カットは終わりました。とても似合っていますよ。Would you like to do a treatment as well? 髪の毛に栄養を与えるトリートメントもご用意しています。";
+    }
+    
+    return response;
+  }
+};
+
 // レッスン関連のAPIサービス
 export const lessonService = {
   // レッスン開始
   startLesson: async () => {
+    // モックAPIを使用する場合
+    if (USE_MOCK_API) {
+      console.log('モックAPI使用: startLesson');
+      return mockAPI.startLesson();
+    }
+    
     try {
       // バックエンドとの互換性のため、シンプルなリクエストに戻す
       const response = await apiClient.post('/lesson/start', {});
@@ -89,6 +142,12 @@ export const lessonService = {
 
   // チャット
   sendMessage: async (message: string, conversationHistory: any[], phase: number = 1, audioFeedback: boolean = true) => {
+    // モックAPIを使用する場合
+    if (USE_MOCK_API) {
+      console.log('モックAPI使用: sendMessage', { message, phase });
+      return mockAPI.sendMessage(message, conversationHistory, phase);
+    }
+    
     try {
       // 会話履歴のフォーマットを確認
       const formattedHistory = conversationHistory.map(msg => ({
@@ -134,6 +193,12 @@ export const lessonService = {
 
   // 音声からテキストへの変換
   transcribeAudio: async (audioBlob: Blob, language: string = 'en') => {
+    // モックAPIを使用する場合は単純に空の結果を返す
+    if (USE_MOCK_API) {
+      console.log('モックAPI使用: transcribeAudio');
+      return { text: "" };
+    }
+    
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob);
@@ -154,6 +219,12 @@ export const lessonService = {
 
   // テキストから音声への変換
   textToSpeech: async (text: string, voice: string = 'nova') => {
+    // モックAPIを使用する場合は単純にnullを返す
+    if (USE_MOCK_API) {
+      console.log('モックAPI使用: textToSpeech');
+      return { audio: null };
+    }
+    
     try {
       const response = await apiClient.post('/text-to-speech', {
         text,
