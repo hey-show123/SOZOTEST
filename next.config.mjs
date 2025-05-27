@@ -3,4 +3,4 @@ const nextConfig = {
   // API設定はここでは使用できないため削除
 };
 
-export default nextConfig;
+export default nextConfig; 
