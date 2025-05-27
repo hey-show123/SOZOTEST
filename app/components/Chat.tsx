@@ -322,7 +322,7 @@ export default function Chat() {
                           <div className="flex items-center mt-1 space-x-2">
                             <button 
                               onClick={() => setCurrentTtsText(message.content)} 
-                              className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 border border-gray-300 rounded px-2 py-1"
+                              className="text-sm text-gray-800 hover:text-black flex items-center gap-1 border border-gray-300 rounded px-2 py-1"
                               title="もう一度読み上げる"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -335,7 +335,7 @@ export default function Chat() {
                             
                                                       <button 
                             onClick={() => toggleTranslation(index)}
-                            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 border border-gray-300 rounded px-2 py-1"
+                            className="text-sm text-gray-800 hover:text-black flex items-center gap-1 border border-gray-300 rounded px-2 py-1"
                             title="翻訳を表示/非表示"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -349,7 +349,7 @@ export default function Chat() {
                       
                       {/* 翻訳テキストの表示 */}
                       {message.role === 'assistant' && showTranslations[index] && (
-                        <div className="mt-1 text-left text-sm text-gray-600 px-3">
+                        <div className="mt-1 text-left text-sm text-gray-800 px-3">
                           {message.translation ? message.translation : '翻訳中...'}
                         </div>
                       )}
@@ -360,10 +360,10 @@ export default function Chat() {
                 // セッション開始前の案内表示
                 <div className="flex flex-col items-center justify-center h-full">
                   <div className="text-center mb-6">
-                    <h2 className="text-xl font-semibold mb-2">
+                    <h2 className="text-xl font-semibold mb-2 text-black">
                       {mode === 'free-talk' ? 'フリートークモード' : 'AIレッスンモード'}
                     </h2>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-black mb-4">
                       {mode === 'free-talk' 
                         ? '自由な英会話を楽しむモードです。美容院のお客さんとして英語で会話できます。' 
                         : '英会話学習のためのAIレッスンモードです。英語のスキルアップをサポートします。'}
@@ -426,7 +426,7 @@ export default function Chat() {
                 </div>
               </div>
             ) : (
-              <div className="text-center text-gray-500">
+              <div className="text-center text-black">
                 「会話を始める」ボタンをクリックして会話を開始してください
               </div>
             )}
