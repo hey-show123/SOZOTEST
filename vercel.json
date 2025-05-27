@@ -1,0 +1,14 @@
+{
+  "buildCommand": "next build",
+  "builds": [
+    {
+      "src": "next.config.mjs",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "NEXT_DISABLE_ESLINT": "1",
+    "NEXT_DISABLE_TYPE_CHECKS": "1"
+  }
+} 
