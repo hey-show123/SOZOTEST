@@ -409,7 +409,7 @@ export default function Chat() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={isRecording ? "録音中..." : "英語または日本語で入力..."}
-                    className="flex-1 p-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 p-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                     disabled={isLoading || isRecording}
                   />
                   <button

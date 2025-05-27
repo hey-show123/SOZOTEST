@@ -270,12 +270,12 @@ export default function DialoguePractice({ onComplete }: DialoguePracticeProps) 
               {dialogueHistory.length > 0 ? (
                 dialogueHistory.map((item, index) => (
                   <div key={index} className="mb-4 pb-4 border-b border-gray-100 last:border-b-0">
-                    <p className="font-semibold text-gray-800">
+                    <p className="font-semibold text-black">
                       {item.role === 'staff' ? 'Staff' : 'Customer'}:
                     </p>
-                    <p className="text-lg">{item.text}</p>
+                    <p className="text-lg text-black">{item.text}</p>
                     {item.translation && (
-                      <p className="text-sm text-gray-600">{item.translation}</p>
+                      <p className="text-sm text-gray-800">{item.translation}</p>
                     )}
                   </div>
                 ))
@@ -295,20 +295,20 @@ export default function DialoguePractice({ onComplete }: DialoguePracticeProps) 
               <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                 {currentStepData.rolePlay.staff && (
                   <div className={`mb-3 ${currentStepData.rolePlay.highlighted ? 'bg-green-100 p-2 rounded' : ''}`}>
-                    <p className="font-semibold text-gray-800">Staff:</p>
-                    <p className="text-lg">{currentStepData.rolePlay.staff}</p>
+                    <p className="font-semibold text-black">Staff:</p>
+                    <p className="text-lg text-black">{currentStepData.rolePlay.staff}</p>
                     {currentStepData.rolePlay.staffJa && (
-                      <p className="text-sm text-gray-600">{currentStepData.rolePlay.staffJa}</p>
+                      <p className="text-sm text-gray-800">{currentStepData.rolePlay.staffJa}</p>
                     )}
                   </div>
                 )}
                 
                 {currentStepData.rolePlay.customer && (
                   <div>
-                    <p className="font-semibold text-gray-800">Customer:</p>
-                    <p className="text-lg">{currentStepData.rolePlay.customer}</p>
+                    <p className="font-semibold text-black">Customer:</p>
+                    <p className="text-lg text-black">{currentStepData.rolePlay.customer}</p>
                     {currentStepData.rolePlay.customerJa && (
-                      <p className="text-sm text-gray-600">{currentStepData.rolePlay.customerJa}</p>
+                      <p className="text-sm text-gray-800">{currentStepData.rolePlay.customerJa}</p>
                     )}
                   </div>
                 )}
