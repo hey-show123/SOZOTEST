@@ -201,7 +201,7 @@ export default function QuestionTime({ onComplete }: QuestionTimeProps) {
             
             {currentStepData.suggestedPhrases && (
               <div className="mb-3">
-                <p className="text-sm text-gray-600 mb-1">フレーズ:</p>
+                <p className="text-sm text-black mb-1">フレーズ:</p>
                 <div className="flex flex-wrap gap-2">
                   {currentStepData.suggestedPhrases.map((phrase, index) => (
                     <button
@@ -218,7 +218,7 @@ export default function QuestionTime({ onComplete }: QuestionTimeProps) {
             
             {currentStepData.suggestedWords && (
               <div>
-                <p className="text-sm text-gray-600 mb-1">単語:</p>
+                <p className="text-sm text-black mb-1">単語:</p>
                 <div className="flex flex-wrap gap-2">
                   {currentStepData.suggestedWords.map((word, index) => (
                     <button
@@ -238,35 +238,23 @@ export default function QuestionTime({ onComplete }: QuestionTimeProps) {
         {currentStepData.shouldPause && (
           <div className="mb-6">
             <form onSubmit={handleSubmitAnswer} className="flex flex-col">
-              <div className="flex justify-center items-center gap-4 mb-4">
+              <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
                 <AudioRecorder 
-                  onTranscription={(text, autoSubmit) => {
-                    handleTranscription(text, autoSubmit);
-                    // 音声認識後に自動的にフォーカスを外して再録音の準備
-                    if (document.activeElement instanceof HTMLElement) {
-                      document.activeElement.blur();
-                    }
-                  }}
+                  onTranscription={handleTranscription} 
                   isRecording={isRecording}
                   setIsRecording={setIsRecording}
                 />
-                <button
-                  type="button"
-                  onClick={handleSkipMic}
-                  className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg"
-                >
-                  回答しました（マイクなし）
-                </button>
+                <input
+                  type="text"
+                  value={userAnswer}
+                  onChange={(e) => setUserAnswer(e.target.value)}
+                  placeholder="英語で答えを入力または録音..."
+                  className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black placeholder-gray-700"
+                  disabled={isRecording}
+                />
               </div>
               
-              <input
-                type="text"
-                value={userAnswer}
-                onChange={(e) => setUserAnswer(e.target.value)}
-                placeholder="ここに英語で回答を入力（または声に出して答えるだけでもOK）"
-                className="p-3 border rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <div className="text-center text-sm text-gray-500 mb-4">
+              <div className="text-center text-sm text-black mb-4">
                 英語で回答してください。フレーズや単語をクリックして使うこともできます。
               </div>
             </form>
@@ -316,7 +304,7 @@ export default function QuestionTime({ onComplete }: QuestionTimeProps) {
                 onChange={toggleAutoAdvance}
                 className="form-checkbox h-5 w-5 text-blue-500"
               />
-              <span className="ml-2 text-sm text-gray-600">自動進行</span>
+              <span className="ml-2 text-sm text-black">自動進行</span>
             </label>
             
             <button
@@ -328,7 +316,7 @@ export default function QuestionTime({ onComplete }: QuestionTimeProps) {
           </div>
         </div>
         
-        <div className="mt-6 text-center text-sm text-gray-500">
+        <div className="mt-6 text-center text-sm text-black">
           <p>{currentStep + 1} / {questionSteps.length}</p>
         </div>
       </div>

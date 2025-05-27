@@ -318,7 +318,7 @@ export default function DialoguePractice({ onComplete }: DialoguePracticeProps) 
             {currentStepData.userRole && (
               <div className="mb-6">
                 <div className="p-3 bg-gray-100 rounded-lg mb-4">
-                  <p className="text-center text-gray-600">
+                  <p className="text-center text-black">
                     ↓ {currentStepData.userRole === 'staff' ? '美容師' : 'お客様'}として英語で話してみてください ↓
                   </p>
                 </div>
@@ -377,7 +377,7 @@ export default function DialoguePractice({ onComplete }: DialoguePracticeProps) 
                     onChange={toggleAutoAdvance}
                     className="form-checkbox h-5 w-5 text-blue-500"
                   />
-                  <span className="ml-2 text-sm text-gray-600">自動進行</span>
+                  <span className="ml-2 text-sm text-black">自動進行</span>
                 </label>
                 
                 <button
@@ -389,7 +389,7 @@ export default function DialoguePractice({ onComplete }: DialoguePracticeProps) 
               </div>
             </div>
             
-            <div className="mt-6 text-center text-sm text-gray-500">
+            <div className="mt-6 text-center text-sm text-black">
               <p>{currentStep + 1} / {dialogueSteps.length}</p>
             </div>
           </div>
