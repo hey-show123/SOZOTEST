@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 // OpenAI TTS APIがサポートする声の種類
-export type VoiceType = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+export type VoiceType = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'ash' | 'sage' | 'coral' | 'ballad' | 'verse';
 
 // 声の情報を定義
 export const VOICE_INFO = {
@@ -12,7 +12,12 @@ export const VOICE_INFO = {
   fable: { name: 'Fable', description: '暖かみのある中性的な声' },
   onyx: { name: 'Onyx', description: '力強い男性的な声' },
   nova: { name: 'Nova', description: '優しい女性的な声' },
-  shimmer: { name: 'Shimmer', description: '明るい女性的な声' }
+  shimmer: { name: 'Shimmer', description: '明るい女性的な声' },
+  ash: { name: 'Ash', description: '穏やかな男性的な声' },
+  sage: { name: 'Sage', description: '落ち着いた中性的な声' },
+  coral: { name: 'Coral', description: '表現力豊かな女性的な声' },
+  ballad: { name: 'Ballad', description: '柔らかく感情豊かな声' },
+  verse: { name: 'Verse', description: '多彩な表現が可能な声' }
 };
 
 type VoiceContextType = {
