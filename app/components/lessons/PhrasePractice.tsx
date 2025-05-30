@@ -136,7 +136,7 @@ export default function PhrasePractice({ onComplete }: PhrasePracticeProps) {
           <div className="mb-6">
             <div className="p-3 bg-gray-100 rounded-lg mb-4">
               <p className="text-center text-gray-600">
-                ↓ フレーズを発音してみてください ↓
+                今日の一言: マイクに向かってお話ししましょう
               </p>
             </div>
             
