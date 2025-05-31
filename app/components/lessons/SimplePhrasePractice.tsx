@@ -50,13 +50,12 @@ export default function SimplePhrasePractice({ onComplete }: SimplePhrasePractic
       const newPracticeCount = practiceCount + 1;
       setPracticeCount(newPracticeCount);
       
-      // 簡易的な判定（完全一致でなくても、ある程度似ていれば良しとする）
+      // 正規化（小文字化、句読点除去、空白除去）
       const normalizedUserAnswer = text.toLowerCase().replace(/[.,?!]/g, '').trim();
       const normalizedKeyPhrase = keyPhrase.text.toLowerCase().replace(/[.,?!]/g, '').trim();
       
-      const similarity = calculateSimilarity(normalizedUserAnswer, normalizedKeyPhrase);
-      
-      if (similarity > 0.7) {
+      // 完全一致のみを正解とする
+      if (normalizedUserAnswer === normalizedKeyPhrase) {
         const newSuccessCount = successCount + 1;
         setSuccessCount(newSuccessCount);
         
@@ -71,27 +70,10 @@ export default function SimplePhrasePractice({ onComplete }: SimplePhrasePractic
         if (newSuccessCount >= 2) {
           setShowContinueButton(true);
         }
-      } else if (similarity > 0.4) {
-        setFeedbackMessage('良い発音です。もう少し練習してみましょう。');
       } else {
-        setFeedbackMessage('もう一度挑戦してみましょう。');
+        setFeedbackMessage('もう一度挑戦してみましょう。発音が正確ではありません。');
       }
     }
-  };
-
-  // 簡易的な文字列類似度計算（0～1の値を返す）
-  const calculateSimilarity = (str1: string, str2: string): number => {
-    const words1 = str1.split(' ');
-    const words2 = str2.split(' ');
-    
-    let matchCount = 0;
-    for (const word1 of words1) {
-      if (words2.some(word2 => word2.includes(word1) || word1.includes(word2))) {
-        matchCount++;
-      }
-    }
-    
-    return matchCount / Math.max(words1.length, words2.length);
   };
 
   // キーフレーズを再生
@@ -128,6 +110,9 @@ export default function SimplePhrasePractice({ onComplete }: SimplePhrasePractic
           <p className="text-center text-gray-800 mb-6 font-medium">
             {successCount < 2 ? `正しい発音に ${successCount}/2 回成功しています。あと ${2 - successCount} 回成功すると次に進めます。` : '正しい発音に2回成功しました！次のセクションに進むことができます。'}
           </p>
+          <p className="text-center text-gray-600 mb-6 text-sm">
+            ※完全に一致した発音のみが正解となります
+          </p>
           
           <div className="flex justify-center mb-4">
             {/* フリートークと同じスタイルの録音ボタン */}
@@ -145,9 +130,7 @@ export default function SimplePhrasePractice({ onComplete }: SimplePhrasePractic
           <div className={`rounded-lg p-4 mb-6 border ${
             feedbackMessage.includes('素晴らしい') 
               ? 'bg-green-100 border-green-300 text-green-900' 
-              : feedbackMessage.includes('良い') 
-                ? 'bg-blue-100 border-blue-300 text-blue-900' 
-                : 'bg-orange-100 border-orange-300 text-orange-900'
+              : 'bg-orange-100 border-orange-300 text-orange-900'
           }`}>
             <p className="text-center font-medium mb-2">
               {feedbackMessage}
