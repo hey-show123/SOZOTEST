@@ -13,7 +13,7 @@ export default function LessonIntroduction({ onComplete }: LessonIntroductionPro
   const [isAudioFinished, setIsAudioFinished] = useState(false);
 
   // レッスンの説明テキスト（一息で読み上げる）
-  const introductionText = "ようこそ、英会話レッスンへ。このレッスンでは美容師として使える英語フレーズを学びます。今日は「Would you like to do a treatment as well?」というフレーズを中心に練習します。このフレーズは、お客様にトリートメントなどの追加サービスを提案するときに使えます。レッスンはフレーズ練習、ダイアログ練習、単語練習、そして簡単な質問タイムで構成されています。それでは、レッスンを始めましょう。";
+  const introductionText = "このレッスンでは「Would you like to do a treatment as well?」を練習します。このフレーズは、お客様にトリートメントなどの追加サービスを提案するときに使えます。それではレッスンを始めましょう。";
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
@@ -48,16 +48,6 @@ export default function LessonIntroduction({ onComplete }: LessonIntroductionPro
                 <li>「Would you like to」構文を正しく使えるようになる</li>
                 <li>美容関連の英単語を身につける</li>
               </ul>
-              
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-green-700 mb-2">レッスン構成</h3>
-                <ol className="list-decimal list-inside text-green-800 space-y-1">
-                  <li>フレーズ練習</li>
-                  <li>ダイアログ練習</li>
-                  <li>単語練習</li>
-                  <li>質問タイム</li>
-                </ol>
-              </div>
             </div>
           </div>
           
