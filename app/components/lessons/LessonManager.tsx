@@ -17,13 +17,13 @@ export type Lesson = {
 // 初期レッスンデータ
 const DEFAULT_LESSONS: Lesson[] = [
   {
-    id: 'english-lessons-1',
-    title: '英語レッスン教材',
-    description: '基本フレーズ、文法ポイント、対話練習などを含む総合的な英語学習教材です。',
-    pdfUrl: '/pdfs/english-lessons.md',
-    systemPrompt: 'あなたは英語教師です。このレッスン教材に基づいて、ユーザーの英語学習をサポートしてください。発音の指導、文法の説明、会話練習など、多角的な指導を行ってください。',
-    level: 'beginner',
-    tags: ['英語', '基本フレーズ', '文法', '会話練習'],
+    id: 'sozo-med-lesson',
+    title: 'SOZOの教室 医療英語レッスン',
+    description: '医療現場で使える英語フレーズを学びます。基本的な問診や診察に関する表現を練習しましょう。',
+    pdfUrl: '/pdfs/sozo_med_29.pdf',
+    systemPrompt: 'あなたは医療英語を教える優秀な英語教師です。PDFの内容に沿って、医療現場で使う英語を丁寧に教えてください。学習者が理解しやすいように、例文や状況に応じた会話例を提示し、適切なフィードバックを行ってください。',
+    level: 'intermediate',
+    tags: ['医療', '英語', '問診'],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }

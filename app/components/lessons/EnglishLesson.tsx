@@ -31,7 +31,7 @@ enum LessonStage {
 export default function EnglishLesson() {
   const [currentStage, setCurrentStage] = useState(LessonStage.INTRODUCTION);
   const [showPDF, setShowPDF] = useState(false);
-  const [showLessonManager, setShowLessonManager] = useState(true); // デフォルトでレッスン管理を表示
+  const [showLessonManager, setShowLessonManager] = useState(true); // 初期表示時にレッスン管理を表示
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [currentPdfUrl, setCurrentPdfUrl] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(false);
