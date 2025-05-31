@@ -144,9 +144,17 @@ export default function Chat() {
     if (!isClient) return;
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'assistant') {
+      console.log('アシスタントメッセージを検出、TTS再生準備');
       setCurrentTtsText(lastMessage.content);
     }
   }, [messages, isClient]);
+  
+  // TTSの再生状態をコンソールに出力（デバッグ用）
+  useEffect(() => {
+    if (isClient) {
+      console.log('音声再生状態:', isAudioPlaying ? '再生中' : '停止中');
+    }
+  }, [isAudioPlaying, isClient]);
 
   // 翻訳表示の切り替え
   const toggleTranslation = async (index: number) => {
@@ -322,7 +330,12 @@ export default function Chat() {
       const audio = new Audio(message.audioUrl);
       setIsAudioPlaying(true);
       audio.play().catch(error => console.error('音声再生エラー:', error));
-      audio.onended = () => setIsAudioPlaying(false);
+      
+      // 音声の再生終了時にフラグをリセット
+      audio.onended = () => {
+        console.log('音声再生終了');
+        setIsAudioPlaying(false);
+      };
     } else {
       // 音声がキャッシュされていない場合はテキストを使って再生
       setCurrentTtsText(message.content);
@@ -367,8 +380,8 @@ export default function Chat() {
       ) : (
         // フリートークモードの場合は通常のチャットを表示
         <>
-          {/* 背景アバター */}
-          <AnimatedAvatar isPlaying={isAudioPlaying} />
+          {/* 背景アバター - 会話開始後のみ表示 */}
+          {sessionStarted && <AnimatedAvatar isPlaying={isAudioPlaying} />}
           
           <div className="p-2 flex justify-end z-10 relative">
             <ChatSettings />
@@ -376,9 +389,9 @@ export default function Chat() {
           
           {/* チャットエリアとマイクボタンの配置 */}
           <div className="flex-1 flex flex-col relative z-10">
-            {/* チャット履歴エリア - 下半分に配置 */}
-            <div className="h-1/2 invisible"></div>
-            <div className="h-1/2 p-4 overflow-y-auto bg-white bg-opacity-75 rounded-t-3xl">
+            {/* チャット履歴エリア - 上部に十分なスペースを確保 */}
+            {sessionStarted && <div className="h-[40%]"></div>}
+            <div className={`${sessionStarted ? 'h-[60%]' : 'h-full'} p-4 overflow-y-auto bg-white bg-opacity-90 rounded-t-3xl`}>
               {sessionStarted ? (
                 // セッション開始後の会話表示
                 <>
@@ -390,7 +403,7 @@ export default function Chat() {
                       }`}
                     >
                       {message.role === 'assistant' && (
-                        <div className="flex items-start gap-2">
+                        <div className="flex items-start">
                           <div
                             className="p-3 rounded-lg max-w-[80%] bg-gray-200 text-gray-800"
                           >

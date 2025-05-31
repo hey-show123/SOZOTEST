@@ -38,15 +38,20 @@ export default function AnimatedAvatar({ isPlaying }: AnimatedAvatarProps) {
     };
   }, [isPlaying]);
 
+  // コンソールログでアニメーション状態を確認
+  useEffect(() => {
+    console.log('アニメーション状態:', isPlaying ? '再生中' : '停止中', '現在の画像:', currentImage);
+  }, [isPlaying, currentImage]);
+
   return (
-    <div className="avatar-background fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none z-0">
-      <div className="relative w-full h-full max-w-xl max-h-xl flex items-start justify-center">
+    <div className="avatar-background absolute top-[10%] left-0 right-0 flex justify-center pointer-events-none">
+      <div className="relative w-auto h-auto max-w-[400px]">
         {currentImage === 'closed' ? (
           <Image
             src="/images/avatar/avatar-closed.png"
             alt="AI Avatar"
-            width={500}
-            height={500}
+            width={400}
+            height={400}
             className="object-contain"
             priority
           />
@@ -54,8 +59,8 @@ export default function AnimatedAvatar({ isPlaying }: AnimatedAvatarProps) {
           <Image
             src="/images/avatar/avatar-open.png"
             alt="AI Avatar Speaking"
-            width={500}
-            height={500}
+            width={400}
+            height={400}
             className="object-contain"
             priority
           />
