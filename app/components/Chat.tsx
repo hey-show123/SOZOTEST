@@ -352,7 +352,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[80vh] max-w-5xl mx-auto bg-white rounded-lg shadow-md">
+    <div className="flex flex-col h-[80vh] max-w-5xl mx-auto bg-white rounded-lg shadow-md relative">
       {/* TTSプレーヤー（非表示） */}
       <AudioPlayer 
         text={currentTtsText} 
@@ -367,14 +367,18 @@ export default function Chat() {
       ) : (
         // フリートークモードの場合は通常のチャットを表示
         <>
-          <div className="p-2 flex justify-end">
+          {/* 背景アバター */}
+          <AnimatedAvatar isPlaying={isAudioPlaying} />
+          
+          <div className="p-2 flex justify-end z-10 relative">
             <ChatSettings />
           </div>
           
           {/* チャットエリアとマイクボタンの配置 */}
-          <div className="flex-1 flex flex-col relative">
-            {/* チャット履歴エリア */}
-            <div className="flex-1 p-4 overflow-y-auto">
+          <div className="flex-1 flex flex-col relative z-10">
+            {/* チャット履歴エリア - 下半分に配置 */}
+            <div className="h-1/2 invisible"></div>
+            <div className="h-1/2 p-4 overflow-y-auto bg-white bg-opacity-75 rounded-t-3xl">
               {sessionStarted ? (
                 // セッション開始後の会話表示
                 <>
@@ -387,7 +391,6 @@ export default function Chat() {
                     >
                       {message.role === 'assistant' && (
                         <div className="flex items-start gap-2">
-                          <AnimatedAvatar isPlaying={isAudioPlaying} />
                           <div
                             className="p-3 rounded-lg max-w-[80%] bg-gray-200 text-gray-800"
                           >
@@ -431,7 +434,7 @@ export default function Chat() {
                       
                       {/* 翻訳テキストの表示 */}
                       {message.role === 'assistant' && showTranslations[index] && (
-                        <div className="mt-1 text-left text-sm text-gray-800 px-3 ml-24">
+                        <div className="mt-1 text-left text-sm text-gray-800 px-3">
                           {message.translation ? message.translation : '翻訳中...'}
                         </div>
                       )}
@@ -461,10 +464,7 @@ export default function Chat() {
               )}
               
               {isLoading && (
-                <div className="text-left mb-4 flex items-start gap-2">
-                  <div className="w-24 h-24 flex items-center justify-center">
-                    <AnimatedAvatar isPlaying={false} />
-                  </div>
+                <div className="text-left mb-4">
                   <div className="p-3 rounded-lg bg-gray-200 text-gray-800">
                     <div className="flex space-x-2">
                       <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
@@ -479,7 +479,7 @@ export default function Chat() {
             
             {/* マイクボタンを中央下部に固定配置 */}
             {sessionStarted && (
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center">
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center z-20">
                 <div className="flex flex-col items-center bg-white bg-opacity-90 p-3 rounded-full shadow-lg">
                   <div className="mb-2 text-center text-sm text-gray-700 font-medium">
                     {isRecording ? "話し終わったらマイクをタップ" : "マイクをタップして話す"}
@@ -498,7 +498,7 @@ export default function Chat() {
 
           {/* 初期状態のみ表示 */}
           {!sessionStarted && (
-            <div className="p-4 border-t flex justify-center items-center">
+            <div className="p-4 border-t flex justify-center items-center relative z-10">
               <div className="text-center text-black">
                 「会話を始める」ボタンをクリックして会話を開始してください
               </div>

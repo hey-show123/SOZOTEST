@@ -39,24 +39,28 @@ export default function AnimatedAvatar({ isPlaying }: AnimatedAvatarProps) {
   }, [isPlaying]);
 
   return (
-    <div className="avatar-container w-24 h-24">
-      {currentImage === 'closed' ? (
-        <Image
-          src="/images/avatar/avatar-closed.png"
-          alt="AI Avatar"
-          width={96}
-          height={96}
-          className="rounded-full"
-        />
-      ) : (
-        <Image
-          src="/images/avatar/avatar-open.png"
-          alt="AI Avatar Speaking"
-          width={96}
-          height={96}
-          className="rounded-full"
-        />
-      )}
+    <div className="avatar-background fixed top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none z-0">
+      <div className="relative w-full h-full max-w-xl max-h-xl flex items-start justify-center">
+        {currentImage === 'closed' ? (
+          <Image
+            src="/images/avatar/avatar-closed.png"
+            alt="AI Avatar"
+            width={500}
+            height={500}
+            className="object-contain"
+            priority
+          />
+        ) : (
+          <Image
+            src="/images/avatar/avatar-open.png"
+            alt="AI Avatar Speaking"
+            width={500}
+            height={500}
+            className="object-contain"
+            priority
+          />
+        )}
+      </div>
     </div>
   );
 } 
