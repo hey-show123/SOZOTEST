@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import VoiceSelector from './VoiceSelector';
+import ModelSelector from './ModelSelector';
 
 export default function ChatSettings() {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,10 +33,20 @@ export default function ChatSettings() {
       </button>
       
       {isOpen && (
-        <div className="absolute top-12 right-0 bg-white p-4 rounded-lg shadow-lg z-20 border border-gray-200 w-72">
+        <div className="absolute top-12 right-0 bg-white p-4 rounded-lg shadow-lg z-20 border border-gray-200 w-80">
           <h3 className="text-lg font-medium border-b pb-2 mb-3">チャット設定</h3>
           
-          <VoiceSelector />
+          {/* モデル選択部分 */}
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">AIモデル設定</h4>
+            <ModelSelector />
+          </div>
+          
+          {/* 音声選択部分 */}
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">音声設定</h4>
+            <VoiceSelector />
+          </div>
           
           <div className="flex justify-end mt-4">
             <button

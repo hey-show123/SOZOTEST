@@ -30,6 +30,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
   const [userAnswer, setUserAnswer] = useState('');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [autoAdvance, setAutoAdvance] = useState(false);
+  const [wordAudioPlaying, setWordAudioPlaying] = useState(false); // 単語音声の再生状態
 
   // 単語練習のステップ
   const vocabularySteps: VocabularyStep[] = [
@@ -38,7 +39,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
       shouldPause: false
     },
     {
-      instruction: "最初の単語は「haircut」です。",
+      instruction: "最初の単語です。",
       vocabulary: {
         word: "haircut",
         translation: "カット",
@@ -49,7 +50,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
       shouldPause: true
     },
     {
-      instruction: "次の単語は「damage」です。",
+      instruction: "次の単語です。",
       vocabulary: {
         word: "damage",
         translation: "ダメージ",
@@ -60,7 +61,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
       shouldPause: true
     },
     {
-      instruction: "次の単語は「treatment」です。",
+      instruction: "次の単語です。",
       vocabulary: {
         word: "treatment",
         translation: "トリートメント",
@@ -71,7 +72,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
       shouldPause: true
     },
     {
-      instruction: "次の単語は「feels」です。",
+      instruction: "次の単語です。",
       vocabulary: {
         word: "feels",
         translation: "〜と感じる",
@@ -82,7 +83,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
       shouldPause: true
     },
     {
-      instruction: "最後の単語は「as well」です。",
+      instruction: "最後の単語です。",
       vocabulary: {
         word: "as well",
         translation: "〜も、同様に",
@@ -103,8 +104,12 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
     setIsAudioPlaying(false);
     setIsAudioFinished(true);
     
+    // 単語音声再生中だった場合は単語再生完了のマークをつける
+    if (wordAudioPlaying) {
+      setWordAudioPlaying(false);
+    }
     // 自動進行が有効で、ポーズが必要ないステップの場合は自動的に次へ
-    if (autoAdvance && !vocabularySteps[currentStep].shouldPause) {
+    else if (autoAdvance && !vocabularySteps[currentStep].shouldPause) {
       handleNext();
     }
   };
@@ -144,9 +149,23 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
     setAutoAdvance(!autoAdvance);
   };
 
+  // 単語を読み上げる
+  const playWord = () => {
+    if (currentStepData.vocabulary) {
+      setWordAudioPlaying(true);
+      setCurrentTtsText(currentStepData.vocabulary.word);
+      setIsAudioPlaying(true);
+    }
+  };
+
   // 現在のテキストをTTSで読み上げる
   useEffect(() => {
-    setCurrentTtsText(vocabularySteps[currentStep].instruction);
+    // 単語のあるステップの場合は、単語のみを読み上げる
+    if (vocabularySteps[currentStep].vocabulary) {
+      setCurrentTtsText(vocabularySteps[currentStep].vocabulary!.word);
+    } else {
+      setCurrentTtsText(vocabularySteps[currentStep].instruction);
+    }
     setIsAudioPlaying(true);
   }, [currentStep]);
 
@@ -169,6 +188,25 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
               <p className="text-xl font-semibold text-yellow-800">
                 {currentStepData.vocabulary.word}
               </p>
+              
+              {/* 単語読み上げボタン */}
+              <button
+                onClick={playWord}
+                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm flex items-center"
+                disabled={wordAudioPlaying}
+              >
+                {wordAudioPlaying ? (
+                  <svg className="animate-spin mr-1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
+                  </svg>
+                )}
+                {wordAudioPlaying ? '再生中...' : '聞く'}
+              </button>
             </div>
             
             {currentStepData.vocabulary.example && (
@@ -220,7 +258,7 @@ export default function VocabularyPractice({ onComplete }: VocabularyPracticePro
         )}
         
         <div className="flex justify-between items-center">
-          <div>
+          <div className="hidden">
             <AudioPlayer 
               text={currentTtsText} 
               autoPlay={true} 

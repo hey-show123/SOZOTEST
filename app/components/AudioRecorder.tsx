@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 type AudioRecorderProps = {
-  onTranscription: (text: string, autoSubmit: boolean) => void;
+  onTranscription: (text: string) => void;
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
 };
@@ -58,6 +58,29 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
     }
   };
 
+  // サポートされている音声形式を検出
+  const getSupportedMimeType = (): string => {
+    // ブラウザがサポートする形式を優先順に試す
+    const mimeTypes = [
+      'audio/webm',
+      'audio/webm;codecs=opus',
+      'audio/mp4',
+      'audio/ogg',
+      'audio/wav'
+    ];
+    
+    for (const mimeType of mimeTypes) {
+      if (MediaRecorder.isTypeSupported(mimeType)) {
+        console.log(`サポートされている音声形式: ${mimeType}`);
+        return mimeType;
+      }
+    }
+    
+    // どれもサポートされていない場合はデフォルト（ブラウザ依存）
+    console.warn('推奨された音声形式がサポートされていません。デフォルト形式を使用します。');
+    return '';
+  };
+
   // 録音開始
   const startRecording = async () => {
     try {
@@ -77,9 +100,17 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
       });
       
       audioStreamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream, { 
-        mimeType: 'audio/webm;codecs=opus' 
-      });
+      
+      // サポートされているMIMEタイプを取得
+      const mimeType = getSupportedMimeType();
+      
+      // MediaRecorderオプションを設定
+      const options: MediaRecorderOptions = {};
+      if (mimeType) {
+        options.mimeType = mimeType;
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -92,7 +123,8 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
           // 録音が途中でキャンセルされていない場合のみ処理
           if (audioChunksRef.current.length > 0) {
             setProcessingStatus('音声を処理中...');
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
+            // 使用したMIMEタイプで新しいBlobを作成
+            const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
             
             // 極端に短い録音は処理しない（0.5秒未満）
             if (audioBlob.size > 1000) {
@@ -116,7 +148,8 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
       };
       
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
+      // データが確実に収集されるように時間間隔を設定
+      mediaRecorder.start(100); // 100ミリ秒ごとにデータを収集
       setIsRecording(true);
       setProcessingStatus('録音中...');
     } catch (error: any) {
@@ -151,10 +184,22 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
         throw new Error('音声ファイルが大きすぎます (25MB以上)');
       }
       
+      // リクエストのデバッグ情報
+      console.log(`音声形式: ${audioBlob.type}, サイズ: ${audioSizeMB.toFixed(2)}MB`);
+      
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
+      
+      // ファイル名を適切なMIMEタイプに基づいて設定
+      const extension = audioBlob.type.includes('webm') ? 'webm' : 
+                       audioBlob.type.includes('mp4') ? 'mp4' : 
+                       audioBlob.type.includes('ogg') ? 'ogg' : 'wav';
+                       
+      formData.append('audio', audioBlob, `recording.${extension}`);
       // 英語認識を明示的に指定
       formData.append('language', 'en');
+      
+      // WhisperモデルタイプをFormDataに追加
+      formData.append('model', 'whisper-1');
 
       const response = await fetch('/api/speech', {
         method: 'POST',
@@ -169,7 +214,7 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
       const data = await response.json();
       if (data.text && data.text.trim() !== '') {
         // 音声認識結果を親コンポーネントに渡し、自動送信するフラグをtrueに設定
-        onTranscription(data.text, true);
+        onTranscription(data.text);
         setProcessingStatus('');
         
         // 録音ボタンにフォーカスを戻す（再録音しやすくするため）
@@ -205,29 +250,29 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
         ref={buttonRef}
         type="button"
         onClick={handleButtonClick}
-        className={`p-3 rounded-full ${
+        className={`p-4 rounded-full ${
           isRecording 
-            ? 'bg-red-500 hover:bg-red-600' 
+            ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
             : isProcessing 
               ? 'bg-gray-400 cursor-wait' 
               : 'bg-blue-500 hover:bg-blue-600'
-        } text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+        } text-white focus:outline-none focus:ring-4 focus:ring-offset-2 ${
           isRecording ? 'focus:ring-red-500' : 'focus:ring-blue-500'
-        }`}
+        } shadow-lg transition-all duration-200`}
         disabled={isProcessing}
         title={isRecording ? "録音を停止" : "録音を開始"}
       >
         {isRecording ? (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
             <path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5z"/>
           </svg>
         ) : isProcessing ? (
-          <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+          <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
             <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
             <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
           </svg>
         ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
             <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5z"/>
             <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0v5zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3z"/>
           </svg>
@@ -235,7 +280,7 @@ export default function AudioRecorder({ onTranscription, isRecording, setIsRecor
       </button>
       
       {(processingStatus || error) && (
-        <div className={`mt-2 text-xs px-2 py-1 rounded ${error ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+        <div className={`mt-2 text-sm px-3 py-1 rounded-full ${error ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
           {error || processingStatus}
         </div>
       )}

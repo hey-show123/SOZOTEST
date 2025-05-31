@@ -17,7 +17,7 @@ import LessonManager, { Lesson } from './LessonManager';
 // レッスンステージの設定
 enum LessonStage {
   INTRODUCTION,
-  SIMPLE_PHRASE_PRACTICE,      // 追加: 単一キーフレーズ練習（今回の実装）
+  SIMPLE_PHRASE_PRACTICE,      // 追加: 今日の一言（今回の実装）
   ALL_IN_ONE_PHRASE_PRACTICE,  // 複数フレーズ一括練習
   PHRASE_PRACTICE,             // 従来の複数ページフレーズ練習
   INTERACTIVE_DIALOGUE_PRACTICE, // 追加: 対話形式の会話練習
@@ -66,11 +66,11 @@ export default function EnglishLesson() {
   };
   
   const handleStageComplete = (stage: LessonStage) => {
-    // 導入からは単一キーフレーズ練習へ進む（新しい要望）
+    // 導入からは単一今日の一言へ進む（新しい要望）
     if (stage === LessonStage.INTRODUCTION) {
       setCurrentStage(LessonStage.SIMPLE_PHRASE_PRACTICE);
     }
-    // 単一キーフレーズ練習からは会話練習へ
+    // 単一今日の一言からは会話練習へ
     else if (stage === LessonStage.SIMPLE_PHRASE_PRACTICE) {
       // 対話形式を使用するかどうかで分岐
       if (useInteractiveMode) {
@@ -176,7 +176,10 @@ export default function EnglishLesson() {
       case LessonStage.INTRODUCTION:
         return <LessonIntroduction onComplete={() => handleStageComplete(LessonStage.INTRODUCTION)} />;
       case LessonStage.SIMPLE_PHRASE_PRACTICE:
-        return <SimplePhrasePractice onComplete={() => handleStageComplete(LessonStage.SIMPLE_PHRASE_PRACTICE)} />;
+        return <SimplePhrasePractice 
+          onComplete={() => handleStageComplete(LessonStage.SIMPLE_PHRASE_PRACTICE)} 
+          avatarImage="/images/_i_icon_15596_icon_155960_256.png" 
+        />;
       case LessonStage.ALL_IN_ONE_PHRASE_PRACTICE:
         return <AllInOnePhrasePractice onComplete={() => handleStageComplete(LessonStage.ALL_IN_ONE_PHRASE_PRACTICE)} />;
       case LessonStage.PHRASE_PRACTICE:

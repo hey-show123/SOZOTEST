@@ -18,8 +18,8 @@ export type Lesson = {
 const DEFAULT_LESSONS: Lesson[] = [
   {
     id: 'sozo-med-lesson',
-    title: 'SOZOの教室 医療英語レッスン',
-    description: '医療現場で使える英語フレーズを学びます。基本的な問診や診察に関する表現を練習しましょう。',
+    title: 'レッスン29',
+    description: '追加のサービスを提案しましょう',
     pdfUrl: '/pdfs/sozo_med_29.pdf',
     systemPrompt: 'あなたは医療英語を教える優秀な英語教師です。PDFの内容に沿って、医療現場で使う英語を丁寧に教えてください。学習者が理解しやすいように、例文や状況に応じた会話例を提示し、適切なフィードバックを行ってください。',
     level: 'intermediate',

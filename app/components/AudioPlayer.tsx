@@ -184,7 +184,7 @@ export default function AudioPlayer({
         audioRef.current.onended = null; // イベントリスナーを削除
       }
     };
-  }, [audioUrl, autoPlay, hasInteracted]);
+  }, [audioUrl, autoPlay, hasInteracted, onFinished, setIsPlaying]);
 
   // 手動で音声を再生
   const handlePlay = async () => {

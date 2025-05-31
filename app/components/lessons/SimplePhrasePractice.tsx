@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import AudioPlayer from '../AudioPlayer';
 import AudioRecorder from '../AudioRecorder';
+import Image from 'next/image';
 
 interface SimplePhrasePracticeProps {
   onComplete: () => void;
+  avatarImage?: string; // アバター画像のパスを受け取るプロパティを追加
 }
 
-export default function SimplePhrasePractice({ onComplete }: SimplePhrasePracticeProps) {
+export default function SimplePhrasePractice({ onComplete, avatarImage }: SimplePhrasePracticeProps) {
   // キーフレーズの情報
   const keyPhrase = {
     text: "Would you like to do a treatment as well?",
@@ -83,39 +85,71 @@ export default function SimplePhrasePractice({ onComplete }: SimplePhrasePractic
   };
 
   return (
-    <div className="w-full h-full p-4 flex flex-col items-center justify-center">
-      <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full">
-        <h2 className="text-xl font-bold text-center mb-6 text-green-700">今日の一言</h2>
-        
-        <div className="bg-yellow-100 border-2 border-yellow-300 rounded-lg p-6 mb-6 transform transition-all hover:shadow-md relative">
-          <p className="text-center text-sm text-yellow-800 mb-2 font-medium">今日のキーフレーズ</p>
-          <p className="text-center text-2xl font-bold text-gray-800 mb-2">{keyPhrase.text}</p>
-          <p className="text-center text-lg text-gray-700">{keyPhrase.translation}</p>
-          
-          {/* フレーズ再生ボタン（右上に配置） */}
-          <button
-            onClick={playKeyPhrase}
-            className="absolute top-4 right-4 text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-100"
-            title="キーフレーズを聞く"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/>
-              <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/>
-              <path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 9.025 8 3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7.5 4v8a.5.5 0 0 1-.78.419l-3-2a.5.5 0 0 1 0-.838l3-2V4a.5.5 0 0 1-.003-.01l-.47-.94a.5.5 0 0 1-.117-.173l.002-.003.471-.942A.5.5 0 0 1 6.717 3.55z"/>
-            </svg>
-          </button>
+    <div className="w-full max-w-md mx-auto p-4 flex flex-col items-center justify-center">
+      <div className="w-full bg-white rounded-3xl shadow-lg p-6 relative">
+        {/* キーフレーズの吹き出し */}
+        <div className="relative mb-10">
+          {/* 吹き出しの黄色い背景 */}
+          <div className="bg-yellow-100 border-2 border-yellow-300 rounded-3xl p-6 mb-2 relative">
+            {/* フレーズと訳文 */}
+            <p className="text-center text-2xl font-bold text-gray-800 mb-4">{keyPhrase.text}</p>
+            <p className="text-center text-lg text-gray-700">{keyPhrase.translation}</p>
+            
+            {/* フレーズ再生ボタン（右上に配置） */}
+            <button
+              onClick={playKeyPhrase}
+              className="absolute top-4 right-4 text-blue-600 hover:text-blue-800"
+              title="キーフレーズを聞く"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/>
+                <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/>
+                <path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 9.025 8 3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7.5 4v8a.5.5 0 0 1-.78.419l-3-2a.5.5 0 0 1 0-.838l3-2V4a.5.5 0 0 1-.003-.01l-.47-.94a.5.5 0 0 1-.117-.173l.002-.003.471-.942A.5.5 0 0 1 6.717 3.55z"/>
+              </svg>
+            </button>
+            
+            {/* 吹き出しの三角形部分 */}
+            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[20px] border-yellow-300"></div>
+          </div>
         </div>
         
-        <div className="bg-gray-100 rounded-lg p-4 mb-6 border border-gray-300">
-          <p className="text-center text-gray-800 mb-6 font-medium">
-            {successCount < 2 ? `正しい発音に ${successCount}/2 回成功しています。あと ${2 - successCount} 回成功すると次に進めます。` : '正しい発音に2回成功しました！次のセクションに進むことができます。'}
-          </p>
-          <p className="text-center text-gray-600 mb-6 text-sm">
-            ※完全に一致した発音のみが正解となります
-          </p>
-          
-          <div className="flex justify-center mb-4">
-            {/* フリートークと同じスタイルの録音ボタン */}
+        {/* アバターとアシスタント名 */}
+        <div className="flex items-center mb-6">
+          <div className="relative w-16 h-16 bg-blue-100 rounded-full overflow-hidden mr-4 flex-shrink-0">
+            {avatarImage ? (
+              // カスタムアバター画像が指定されている場合
+              <Image 
+                src={avatarImage} 
+                alt="SOZO Assistant" 
+                fill 
+                className="object-cover"
+              />
+            ) : (
+              // デフォルトのシンプルなアバターアイコン
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="8" r="5" />
+                  <path d="M20 21v-2a7 7 0 0 0-14 0v2" />
+                  {/* ヘッドフォンの簡易表現 */}
+                  <path d="M2 12h2v4h-2z" fill="currentColor" />
+                  <path d="M20 12h2v4h-2z" fill="currentColor" />
+                  <path d="M2 12c0-3 2-4 4-4" strokeLinecap="round" />
+                  <path d="M22 12c0-3-2-4-4-4" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 className="text-xl font-bold">SOZO アシスタント</h3>
+            <p className="text-lg text-gray-700">
+              もうちょっと！あと{2 - successCount}回言えたらバッチリ！発音が合ってたら、次に進めるよ〜 がんばって！
+            </p>
+          </div>
+        </div>
+        
+        {/* マイクボタン */}
+        <div className="flex justify-center mb-6">
+          <div className="w-20 h-20">
             <AudioRecorder 
               onTranscription={(text) => {
                 handleTranscription(text);
@@ -126,35 +160,34 @@ export default function SimplePhrasePractice({ onComplete }: SimplePhrasePractic
           </div>
         </div>
         
+        {/* フィードバックメッセージ */}
         {userAnswer && (
-          <div className={`rounded-lg p-4 mb-6 border ${
+          <div className={`rounded-lg p-4 mb-6 text-center ${
             feedbackMessage.includes('素晴らしい') 
-              ? 'bg-green-100 border-green-300 text-green-900' 
-              : 'bg-orange-100 border-orange-300 text-orange-900'
+              ? 'text-green-600 font-medium' 
+              : 'text-orange-600 font-medium'
           }`}>
-            <p className="text-center font-medium mb-2">
-              {feedbackMessage}
-            </p>
-            <p className="text-center text-gray-800">
-              あなたの発音: <span className="font-medium">{userAnswer}</span>
-            </p>
+            <p className="mb-2">{feedbackMessage}</p>
+            <p className="text-gray-700">あなたの発音: <span className="font-medium">{userAnswer}</span></p>
           </div>
         )}
         
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-700 font-medium">
-            練習回数: {practiceCount}
-          </div>
-          
-          {showContinueButton && (
+        {/* フッターメッセージ */}
+        <p className="text-center text-gray-700 font-medium mb-4">
+          最初の一歩です！がんばろう👍
+        </p>
+        
+        {/* 次へボタン */}
+        {showContinueButton && (
+          <div className="flex justify-center">
             <button
               onClick={onComplete}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium shadow-md transition-transform transform hover:scale-105"
             >
               次のセクションへ
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       
       {/* 音声プレーヤー */}

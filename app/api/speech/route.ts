@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { WhisperModelType } from '../../context/ModelContext';
 
 // OpenAI APIクライアントを初期化
 const openai = new OpenAI({
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
     const language = formData.get('language') as string || 'en'; // デフォルトは英語
+    const whisperModel = (formData.get('model') as WhisperModelType) || 'whisper-1'; // デフォルトはwhisper-1
 
     if (!audioFile) {
       return NextResponse.json({ error: '音声ファイルが見つかりません' }, { status: 400 });
@@ -50,10 +52,20 @@ export async function POST(request: Request) {
     }
 
     // 許可されるMIMEタイプを確認
-    const validMimeTypes = ['audio/webm', 'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/ogg'];
+    const validMimeTypes = [
+      'audio/webm', 
+      'audio/mp3', 
+      'audio/mpeg', 
+      'audio/wav', 
+      'audio/x-wav', 
+      'audio/ogg',
+      'audio/webm;codecs=opus' // opusコーデックを使用したwebmをサポート
+    ];
+    
+    // MIMEタイプの検証とログ
     const fileType = audioFile.type;
     
-    if (!validMimeTypes.includes(fileType)) {
+    if (!validMimeTypes.some(type => fileType.startsWith(type.split(';')[0]))) {
       console.warn(`サポートされていない音声形式: ${fileType}`);
       // MIMEタイプが一致しなくても処理は続行する（警告のみ）
     }
@@ -62,7 +74,7 @@ export async function POST(request: Request) {
       // Whisper APIを呼び出し
       const transcription = await openai.audio.transcriptions.create({
         file: audioFile,
-        model: 'whisper-1',
+        model: whisperModel,
         language: language,
         response_format: 'json',
       });

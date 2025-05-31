@@ -25,7 +25,7 @@ interface ExtendedSpeechParams {
   input: string;
   speed?: number;
   quality?: 'standard' | 'high';
-  response_format?: 'mp3' | 'opus' | 'aac' | 'flac';
+  instructions?: string; // GPT-4o Mini TTSの指示用パラメータを追加
 }
 
 // テキストを適切な長さに分割する関数
@@ -107,61 +107,84 @@ export async function POST(request: Request) {
       ? model
       : 'tts-1';
 
-    try {
-      // テキストを適切な長さのチャンクに分割
-      const textChunks = splitTextIntoChunks(text);
-      const audioBuffers: Buffer[] = [];
-      
-      // 各チャンクを個別に処理
-      for (const chunk of textChunks) {
-        // APIオプションを設定
-        const apiOptions: ExtendedSpeechParams = {
-          model: validModel as TTSModelType,
-          voice: validVoice as VoiceType,
-          input: chunk,
-          response_format: 'mp3'
+    // GPT-4o Mini TTSモデルの場合
+    if (validModel === 'gpt-4o-mini-tts') {
+      try {
+        // テキストを適切な長さのチャンクに分割（長いテキストの場合の安定性向上のため）
+        const textChunks = splitTextIntoChunks(text, 1000);
+        const audioBuffers: Buffer[] = [];
+        
+        // 声質プロンプトの設定
+        const instructions = useCustomPrompt && ttsPrompt 
+          ? ttsPrompt 
+          : '自然な声で読み上げてください。一定の音量と明瞭な発声を維持してください。';
+        
+        // 各チャンクを個別に処理
+        for (const chunk of textChunks) {
+          // TTS APIを直接呼び出す
+          const response = await openai.audio.speech.create({
+            model: 'gpt-4o-mini-tts',
+            voice: validVoice as VoiceType,
+            input: chunk,
+            instructions: instructions,
+            response_format: 'mp3'
+          });
+
+          // 音声データを取得
+          const buffer = Buffer.from(await response.arrayBuffer());
+          
+          // バッファに追加
+          audioBuffers.push(buffer);
+        }
+        
+        // すべての音声バッファを結合
+        const combinedBuffer = concatenateBuffers(audioBuffers);
+        
+        // レスポンスヘッダーを設定
+        const headers = {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': combinedBuffer.length.toString(),
         };
-
-        // GPT-4o Mini TTSモデルの場合、system instructionsが必要であればこちらで追加
-        if (validModel === 'gpt-4o-mini-tts' && useCustomPrompt && ttsPrompt) {
-          // 残念ながら現在のAPIでは直接instructionsパラメータをサポートしていないようですが、
-          // 将来的にサポートされる可能性があるため、コードを残しておきます
-          // @ts-expect-error instructions はOpenAI APIの型定義に含まれていない可能性がある
-          apiOptions.instructions = ttsPrompt;
-        }
         
-        // tts-1-hdモデルの場合は高品質設定を適用
-        if (validModel === 'tts-1-hd') {
-          apiOptions.quality = 'high'; // 高品質設定
-        }
-
-        // TTS APIを呼び出し
-        const audioResponse = await openai.audio.speech.create(apiOptions);
-        
-        // 音声データをバッファに変換
-        const buffer = Buffer.from(await audioResponse.arrayBuffer());
-        
-        // バッファに追加
-        audioBuffers.push(buffer);
+        // 結合した音声データを返す
+        return new NextResponse(combinedBuffer, { status: 200, headers });
+      } catch (error) {
+        console.error('GPT-4o Mini TTS APIエラー:', error);
+        // 標準のTTS APIにフォールバック
+        console.log('標準のTTS APIにフォールバックします');
+        validModel = 'tts-1-hd';
       }
-      
-      // すべての音声バッファを結合
-      const combinedBuffer = concatenateBuffers(audioBuffers);
-      
-      // レスポンスヘッダーを設定
-      const headers = {
-        'Content-Type': 'audio/mpeg',
-        'Content-Length': combinedBuffer.length.toString(),
-      };
-      
-      // 結合した音声データを返す
-      return new NextResponse(combinedBuffer, { status: 200, headers });
-    } catch (error) {
-      console.error('TTS APIエラー:', error);
-      return NextResponse.json({ error: '音声合成に失敗しました' }, { status: 500 });
     }
+
+    // 標準のTTS APIを使用
+    // APIオプションを設定
+    const apiOptions: ExtendedSpeechParams = {
+      model: validModel as TTSModelType,
+      voice: validVoice as VoiceType,
+      input: text,
+    };
+
+    // tts-1-hdモデルの場合は高品質設定を適用
+    if (validModel === 'tts-1-hd') {
+      apiOptions.quality = 'high'; // 高品質設定
+    }
+
+    // TTS APIを呼び出し
+    const audioResponse = await openai.audio.speech.create(apiOptions);
+
+    // 音声データをバッファに変換
+    const buffer = Buffer.from(await audioResponse.arrayBuffer());
+
+    // レスポンスヘッダーを設定
+    const headers = {
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': buffer.length.toString(),
+    };
+
+    // 音声データを返す
+    return new NextResponse(buffer, { status: 200, headers });
   } catch (error) {
-    console.error('リクエスト処理エラー:', error);
+    console.error('TTS APIエラー:', error);
     return NextResponse.json({ error: '音声合成に失敗しました' }, { status: 500 });
   }
 } 
