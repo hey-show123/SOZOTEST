@@ -24,23 +24,26 @@ export default function SimplePhrasePractice({ onComplete, avatarImage }: Simple
   const [successCount, setSuccessCount] = useState(0); // 正しい発音に成功した回数
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [showContinueButton, setShowContinueButton] = useState(false);
-  const [audioText, setAudioText] = useState(keyPhrase.text); // 再生する音声テキスト
+  const [audioText, setAudioText] = useState(keyPhrase.text); // 初期値をキーフレーズに設定
+  const [initialPlayDone, setInitialPlayDone] = useState(false);
 
-  // コンポーネントがマウントされたらキーフレーズを自動的に再生
+  // コンポーネントがマウントされたら自動的にキーフレーズを再生する
   useEffect(() => {
+    // すでに再生済みの場合は実行しない
+    if (initialPlayDone) return;
+    
     // 少し遅延させて再生（画面表示後に再生するため）
     const timer = setTimeout(() => {
-      // 直接フレーズだけを再生するように設定
-      setAudioText(keyPhrase.text);
       setIsAudioPlaying(true);
-    }, 1000);
+    }, 500);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [initialPlayDone]);
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
+    setInitialPlayDone(true); // 初回再生完了をマーク
   };
 
   // 音声認識結果の処理

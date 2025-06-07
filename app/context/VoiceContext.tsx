@@ -29,8 +29,8 @@ type VoiceContextType = {
 const VoiceContext = createContext<VoiceContextType | undefined>(undefined);
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
-  // 初期値はechoを使用（サーバーサイドレンダリングの一貫性のため）
-  const [voice, setVoice] = useState<VoiceType>('echo');
+  // 初期値はnovaを使用（サーバーサイドレンダリングの一貫性のため）
+  const [voice, setVoice] = useState<VoiceType>('nova');
   const [isClient, setIsClient] = useState(false);
 
   // クライアントサイドでのみ実行される初期化処理

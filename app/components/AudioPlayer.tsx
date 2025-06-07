@@ -32,13 +32,6 @@ export default function AudioPlayer({
   const isPlaying = externalIsPlaying !== undefined ? externalIsPlaying : internalIsPlaying;
   const setIsPlaying = externalSetIsPlaying || setInternalIsPlaying;
 
-  // デバッグ用：テキストが変更されたときのログ
-  useEffect(() => {
-    if (text && text.trim() !== '') {
-      console.log('AudioPlayer: 新しいテキストを受信:', text.substring(0, 30) + '...');
-    }
-  }, [text]);
-
   // ユーザーインタラクション検出
   useEffect(() => {
     const handleInteraction = () => {
@@ -70,8 +63,6 @@ export default function AudioPlayer({
         setIsPlaying(false);
         setShowPlayButton(false);
         
-        console.log('AudioPlayer: TTS生成中...');
-        
         // TTS APIを呼び出し
         const response = await fetch('/api/tts', {
           method: 'POST',
@@ -93,7 +84,6 @@ export default function AudioPlayer({
         }
         const newAudioUrl = URL.createObjectURL(audioBlob);
         setAudioUrl(newAudioUrl);
-        console.log('AudioPlayer: TTS生成完了');
       } catch (error) {
         console.error('音声生成エラー:', error);
         setShowPlayButton(false);
@@ -126,7 +116,6 @@ export default function AudioPlayer({
           // 再生終了時のイベントリスナー
           audioRef.current.onended = () => {
             if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
-            console.log('AudioPlayer: 再生終了');
             setIsPlaying(false);
             if (onFinished) {
               onFinished();
@@ -135,7 +124,6 @@ export default function AudioPlayer({
           
           if (autoPlay && hasInteracted) {
             try {
-              console.log('AudioPlayer: 再生開始');
               await audioRef.current.play();
               if (!isEffectActive) {
                 audioRef.current.pause(); // エフェクトが無効になっていたら再生を停止
@@ -155,7 +143,6 @@ export default function AudioPlayer({
           const audio = new Audio(audioUrl);
           audio.onended = () => {
             if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
-            console.log('AudioPlayer: 再生終了');
             setIsPlaying(false);
             if (onFinished) {
               onFinished();
@@ -165,7 +152,6 @@ export default function AudioPlayer({
           
           if (autoPlay && hasInteracted) {
             try {
-              console.log('AudioPlayer: 再生開始');
               await audio.play();
               if (!isEffectActive) {
                 audio.pause(); // エフェクトが無効になっていたら再生を停止
@@ -198,12 +184,7 @@ export default function AudioPlayer({
         audioRef.current.onended = null; // イベントリスナーを削除
       }
     };
-  }, [audioUrl, autoPlay, hasInteracted, onFinished, setIsPlaying]);
-
-  // 音声再生状態の変更をログ出力
-  useEffect(() => {
-    console.log('AudioPlayer: 再生状態変更:', isPlaying ? '再生中' : '停止中');
-  }, [isPlaying]);
+  }, [audioUrl, autoPlay, hasInteracted]);
 
   // 手動で音声を再生
   const handlePlay = async () => {
