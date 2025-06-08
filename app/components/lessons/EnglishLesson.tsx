@@ -11,7 +11,6 @@ import DialoguePractice from './DialoguePractice';
 import AllInOneDialoguePractice from './AllInOneDialoguePractice';
 import InteractiveDialoguePractice from './InteractiveDialoguePractice';
 import VocabularyPractice from './VocabularyPractice';
-import ChatSettings from '../ChatSettings';
 import LessonManager, { Lesson } from './LessonManager';
 
 // レッスンステージの設定
@@ -32,7 +31,7 @@ enum LessonStage {
 export default function EnglishLesson() {
   const [currentStage, setCurrentStage] = useState(LessonStage.INTRODUCTION);
   const [showPDF, setShowPDF] = useState(false);
-  const [showLessonManager, setShowLessonManager] = useState(true); // 初期表示時にレッスン管理を表示
+  const [showLessonManager, setShowLessonManager] = useState(false); // 初期表示時にレッスン管理を表示しない
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [currentPdfUrl, setCurrentPdfUrl] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(false);
@@ -65,14 +64,25 @@ export default function EnglishLesson() {
       
       // レッスンIDが保存されていれば、対応するレッスンを特定
       const savedLessonId = sessionStorage.getItem('currentLessonId');
-      if (savedLessonId) {
-        const savedLessons = localStorage.getItem('lessons');
-        if (savedLessons) {
-          const lessons = JSON.parse(savedLessons) as Lesson[];
+      const savedLessons = localStorage.getItem('lessons');
+      
+      if (savedLessons) {
+        const lessons = JSON.parse(savedLessons) as Lesson[];
+        
+        if (savedLessonId) {
           const foundLesson = lessons.find(l => l.id === savedLessonId);
           if (foundLesson) {
             setCurrentLesson(foundLesson);
-            setShowLessonManager(false);
+            return;
+          }
+        }
+        
+        // レッスンIDが保存されていないか、見つからない場合は最初のレッスンを使用
+        if (lessons.length > 0) {
+          setCurrentLesson(lessons[0]);
+          if (lessons[0].pdfUrl) {
+            setCurrentPdfUrl(lessons[0].pdfUrl);
+            setShowPDF(true);
           }
         }
       }
@@ -146,11 +156,6 @@ export default function EnglishLesson() {
     setShowPDF(!showPDF);
   };
 
-  // レッスンマネージャーの表示切替
-  const toggleLessonManager = () => {
-    setShowLessonManager(!showLessonManager);
-  };
-
   // PDFビューアー部分
   const renderPDFViewer = () => {
     if (!currentPdfUrl) {
@@ -158,12 +163,6 @@ export default function EnglishLesson() {
         <div className="flex items-center justify-center h-full bg-gray-100 p-4">
           <div className="text-center">
             <p className="text-gray-500 mb-2">PDFが設定されていません</p>
-            <button 
-              onClick={toggleLessonManager}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              レッスン管理
-            </button>
           </div>
         </div>
       );
@@ -249,38 +248,22 @@ export default function EnglishLesson() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="p-2 flex justify-between items-center border-b">
-        <div className="flex space-x-2">
+      {isMobile && currentPdfUrl && (
+        <div className="p-1 flex justify-end items-center border-b">
           <button
-            onClick={toggleLessonManager}
-            className={`px-3 py-1 text-sm rounded flex items-center ${
-              showLessonManager ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'
+            onClick={togglePDF}
+            className={`px-2 py-1 text-xs rounded flex items-center ${
+              showPDF ? 'bg-green-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'
             }`}
-            title="レッスン管理"
+            title="PDF切替"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-              <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+              <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V9H3V2a1 1 0 0 1 1-1h5.5v2zM3 12v-2h2v2H3zm0 1h2v2H4a1 1 0 0 1-1-1v-1zm3 2v-2h3v2H6zm4 0v-2h3v1a1 1 0 0 1-1 1h-2zm3-3h-3v-2h3v2zm-7 0v-2h3v2H6z"/>
             </svg>
-            {showLessonManager ? 'レッスン管理中' : 'レッスン管理'}
+            {showPDF ? 'PDFを隠す' : 'PDFを表示'}
           </button>
-          
-          {isMobile && currentPdfUrl && (
-            <button
-              onClick={togglePDF}
-              className={`px-3 py-1 text-sm rounded flex items-center ${
-                showPDF ? 'bg-green-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'
-              }`}
-              title="PDF切替"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-                <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V9H3V2a1 1 0 0 1 1-1h5.5v2zM3 12v-2h2v2H3zm0 1h2v2H4a1 1 0 0 1-1-1v-1zm3 2v-2h3v2H6zm4 0v-2h3v1a1 1 0 0 1-1 1h-2zm3-3h-3v-2h3v2zm-7 0v-2h3v2H6z"/>
-              </svg>
-              {showPDF ? 'PDFを隠す' : 'PDFを表示'}
-            </button>
-          )}
         </div>
-        <ChatSettings />
-      </div>
+      )}
       
       {/* PCとタブレット用のレイアウト（上下分割ではなく左右分割） */}
       {!isMobile ? (
