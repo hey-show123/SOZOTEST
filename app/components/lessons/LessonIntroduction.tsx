@@ -2,16 +2,35 @@
 
 import { useState, useEffect, useRef } from 'react';
 import AudioPlayer from '../AudioPlayer';
+import { Goal } from './LessonManager';
 
 interface LessonIntroductionProps {
   onComplete: () => void;
+  goals?: Goal[]; // レッスンの目標リスト
+  headerTitle?: string; // ヘッダータイトル
+  startButtonText?: string; // 開始ボタンのテキスト
 }
 
-export default function LessonIntroduction({ onComplete }: LessonIntroductionProps) {
+export default function LessonIntroduction({ 
+  onComplete, 
+  goals, 
+  headerTitle = 'レッスン29: Would you like to do a treatment as well?',
+  startButtonText = 'レッスン開始'
+}: LessonIntroductionProps) {
   const [audioText, setAudioText] = useState<string>('');
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioPlayed, setAudioPlayed] = useState(false);
   const audioInitializedRef = useRef(false);
+
+  // デフォルトの目標リスト（goalsが指定されていない場合）
+  const defaultGoals: Goal[] = [
+    { text: 'トリートメントなどの追加メニューを自然におすすめできるようになる' },
+    { text: '「Would you like to～?」の言い方に慣れる' },
+    { text: 'サロンでよく使う英語の言葉を覚える' }
+  ];
+
+  // 表示する目標リスト
+  const displayGoals = goals || defaultGoals;
 
   // 再生するメッセージの配列
   const introMessages = [
@@ -60,8 +79,7 @@ export default function LessonIntroduction({ onComplete }: LessonIntroductionPro
         <div className="gradient-flow text-white rounded-2xl p-4 sm:p-6 -mt-8 sm:-mt-16 mb-6 sm:mb-8 shadow-lg transform -rotate-1 relative">
           <div className="absolute inset-0 bg-black opacity-10 rounded-2xl"></div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center relative z-10 break-words">
-            レッスン29: <br className="sm:hidden" />
-            <span className="leading-tight">Would you like to do a treatment as well?</span>
+            {headerTitle}
           </h1>
           <div className="absolute -bottom-3 -right-3 w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center transform rotate-12 shadow-md">
             <span className="text-slate-900 font-bold text-sm">New!</span>
@@ -76,18 +94,12 @@ export default function LessonIntroduction({ onComplete }: LessonIntroductionPro
             <span className="text-gradient">レッスンの目標</span>
           </h2>
           <ul className="space-y-4 sm:space-y-5 overflow-y-auto max-h-[40vh] sm:max-h-none">
-            <li className="flex items-start transform transition-all duration-300 hover:translate-x-2">
-              <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white mr-3 shadow-md">•</span>
-              <span className="text-gray-800 dark:text-gray-200 text-sm sm:text-base">トリートメントなどの追加メニューを自然におすすめできるようになる</span>
-            </li>
-            <li className="flex items-start transform transition-all duration-300 hover:translate-x-2">
-              <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white mr-3 shadow-md">•</span>
-              <span className="text-gray-800 dark:text-gray-200 text-sm sm:text-base">「Would you like to〜?」の言い方に慣れる</span>
-            </li>
-            <li className="flex items-start transform transition-all duration-300 hover:translate-x-2">
-              <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white mr-3 shadow-md">•</span>
-              <span className="text-gray-800 dark:text-gray-200 text-sm sm:text-base">サロンでよく使う英語の言葉を覚える</span>
-            </li>
+            {displayGoals.map((goal, index) => (
+              <li key={index} className="flex items-start transform transition-all duration-300 hover:translate-x-2">
+                <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white mr-3 shadow-md">•</span>
+                <span className="text-gray-800 dark:text-gray-200 text-sm sm:text-base">{goal.text}</span>
+              </li>
+            ))}
           </ul>
         </div>
         
@@ -97,7 +109,7 @@ export default function LessonIntroduction({ onComplete }: LessonIntroductionPro
             onClick={handleNext}
             className="w-full relative py-3 sm:py-4 rounded-xl transition-all bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 text-white text-lg sm:text-xl font-semibold shadow-md hover:shadow-xl transform hover:-translate-y-1 active:translate-y-0 overflow-hidden group"
           >
-            <span className="relative z-10">レッスン開始</span>
+            <span className="relative z-10">{startButtonText}</span>
             <span className="absolute inset-0 w-full h-full shimmer"></span>
             <span className="absolute bottom-0 left-0 w-full h-0.5 bg-white transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
           </button>

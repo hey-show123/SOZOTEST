@@ -14,6 +14,10 @@ export type DialogueTurn = {
   turnNumber: number;
 };
 
+export type Goal = {
+  text: string;
+};
+
 export type Lesson = {
   id: string;
   title: string;
@@ -26,6 +30,9 @@ export type Lesson = {
   updatedAt: number;
   keyPhrase?: Phrase;
   dialogueTurns?: DialogueTurn[];
+  goals?: Goal[];
+  headerTitle?: string;
+  startButtonText?: string;
 };
 
 // デフォルトのダイアログ
@@ -75,7 +82,14 @@ const DEFAULT_LESSONS: Lesson[] = [
     createdAt: Date.now(),
     updatedAt: Date.now(),
     keyPhrase: DEFAULT_KEY_PHRASE,
-    dialogueTurns: DEFAULT_DIALOGUE
+    dialogueTurns: DEFAULT_DIALOGUE,
+    headerTitle: 'レッスン29: Would you like to do a treatment as well?',
+    startButtonText: 'レッスン開始',
+    goals: [
+      { text: 'トリートメントなどの追加メニューを自然におすすめできるようになる' },
+      { text: '「Would you like to～?」の言い方に慣れる' },
+      { text: 'サロンでよく使う英語の言葉を覚える' }
+    ]
   }
 ];
 
@@ -101,7 +115,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     tags: '',
     keyPhraseText: '',
     keyPhraseTranslation: '',
-    dialogueText: ''
+    dialogueText: '',
+    goalsText: '', // 目標のテキスト（1行に1つの目標）
+    headerTitle: '', // ヘッダータイトル
+    startButtonText: '' // 開始ボタンのテキスト
   });
 
   // コンポーネントマウント時にローカルストレージからレッスンを読み込む
@@ -155,7 +172,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       keyPhraseTranslation: DEFAULT_KEY_PHRASE.translation,
       dialogueText: DEFAULT_DIALOGUE.map(turn => 
         `${turn.role}: "${turn.text}" - "${turn.translation}"`
-      ).join('\n')
+      ).join('\n'),
+      goalsText: DEFAULT_LESSONS[0].goals?.map(goal => goal.text).join('\n') || '',
+      headerTitle: DEFAULT_LESSONS[0].headerTitle || '',
+      startButtonText: DEFAULT_LESSONS[0].startButtonText || 'レッスン開始'
     });
     setIsAdding(true);
     setIsEditing(false);
@@ -172,6 +192,11 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
           `${turn.role}: "${turn.text}" - "${turn.translation}"`
         ).join('\n');
 
+    // 目標テキストの変換
+    const goalsText = lesson.goals 
+      ? lesson.goals.map(goal => goal.text).join('\n')
+      : DEFAULT_LESSONS[0].goals?.map(goal => goal.text).join('\n') || '';
+
     setFormData({
       id: lesson.id,
       title: lesson.title,
@@ -182,7 +207,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       tags: lesson.tags.join(', '),
       keyPhraseText: lesson.keyPhrase?.text || DEFAULT_KEY_PHRASE.text,
       keyPhraseTranslation: lesson.keyPhrase?.translation || DEFAULT_KEY_PHRASE.translation,
-      dialogueText
+      dialogueText,
+      goalsText,
+      headerTitle: lesson.headerTitle || DEFAULT_LESSONS[0].headerTitle || '',
+      startButtonText: lesson.startButtonText || DEFAULT_LESSONS[0].startButtonText || 'レッスン開始'
     });
     setIsEditing(true);
     setIsAdding(false);
@@ -274,6 +302,12 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       translation: formData.keyPhraseTranslation
     };
 
+    // 目標の解析
+    const goals: Goal[] = formData.goalsText
+      .split('\n')
+      .filter(line => line.trim())
+      .map(text => ({ text: text.trim() }));
+
     const tagsArray = formData.tags
       .split(',')
       .map(tag => tag.trim())
@@ -290,7 +324,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       createdAt: isAdding ? Date.now() : (currentLesson?.createdAt || Date.now()),
       updatedAt: Date.now(),
       keyPhrase,
-      dialogueTurns
+      dialogueTurns,
+      goals: goals.length > 0 ? goals : undefined,
+      headerTitle: formData.headerTitle.trim() || undefined,
+      startButtonText: formData.startButtonText.trim() || undefined
     };
 
     let updatedLessons: Lesson[];
@@ -486,6 +523,55 @@ customer: "Sure." - "はい"'
               </div>
             </div>
             
+            {/* 目標設定 */}
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-lg font-medium mb-3">レッスン目標設定</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                各行に1つの目標を入力してください。行ごとに別々の目標として表示されます。
+              </p>
+              <div className="mb-4">
+                <textarea
+                  name="goalsText"
+                  value={formData.goalsText}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                  rows={4}
+                  placeholder='トリートメントなどの追加メニューを自然におすすめできるようになる
+「Would you like to～?」の言い方に慣れる
+サロンでよく使う英語の言葉を覚える'
+                />
+              </div>
+            </div>
+            
+            {/* カスタムテキスト設定 */}
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-lg font-medium mb-3">カスタムテキスト設定</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">ヘッダータイトル</label>
+                <input
+                  type="text"
+                  name="headerTitle"
+                  value={formData.headerTitle}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                  placeholder="例: レッスン29: Would you like to do a treatment as well?"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">開始ボタンテキスト</label>
+                <input
+                  type="text"
+                  name="startButtonText"
+                  value={formData.startButtonText}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                  placeholder="例: レッスン開始"
+                />
+              </div>
+            </div>
+            
             <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="button"
@@ -538,80 +624,4 @@ customer: "Sure." - "はい"'
                       <div className="mt-2 mb-2 flex items-center">
                         <span className="text-xs text-gray-500 mr-1">URL:</span>
                         <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-blue-600 truncate max-w-[200px] inline-block">
-                          {typeof window !== 'undefined' ? `${window.location.origin}/lesson/${lesson.id}` : `/lesson/${lesson.id}`}
-                        </code>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // 親要素のクリックイベントを防止
-                            if (typeof window !== 'undefined') {
-                              navigator.clipboard.writeText(`${window.location.origin}/lesson/${lesson.id}`);
-                              alert('URLをコピーしました！');
-                            }
-                          }}
-                          className="ml-1 text-xs text-blue-500 hover:text-blue-700"
-                          title="URLをコピー"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                            <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-                          </svg>
-                        </button>
-                      </div>
-                      
-                      <div className="flex items-center mt-2">
-                        <span className={`px-2 py-0.5 text-xs rounded ${
-                          lesson.level === 'beginner' ? 'bg-green-100 text-green-800' :
-                          lesson.level === 'intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {lesson.level === 'beginner' ? '初級' : 
-                           lesson.level === 'intermediate' ? '中級' : '上級'}
-                        </span>
-                        
-                        <div className="ml-2 flex flex-wrap gap-1">
-                          {lesson.tags.map((tag, idx) => (
-                            <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => handleStartEdit(lesson)}
-                        className="p-1 text-blue-500 hover:bg-blue-100 rounded"
-                        title="編集"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteLesson(lesson.id)}
-                        className="p-1 text-red-500 hover:bg-red-100 rounded"
-                        title="削除"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                          <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-              
-              {lessons.length === 0 && (
-                <li className="p-6 text-center text-gray-500">
-                  レッスンがありません。「新規追加」ボタンからレッスンを追加してください。
-                </li>
-              )}
-            </ul>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-} 
+                          {typeof window !== 'undefined' ? `${window.location.origin}/lesson/${lesson.id}` : `/lesson/${lesson.id}`

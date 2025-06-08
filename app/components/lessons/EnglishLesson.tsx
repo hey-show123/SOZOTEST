@@ -191,7 +191,12 @@ export default function EnglishLesson() {
     
     switch (currentStage) {
       case LessonStage.INTRODUCTION:
-        return <LessonIntroduction onComplete={() => handleStageComplete(LessonStage.INTRODUCTION)} />;
+        return <LessonIntroduction 
+          onComplete={() => handleStageComplete(LessonStage.INTRODUCTION)} 
+          goals={currentLesson?.goals}
+          headerTitle={currentLesson?.headerTitle}
+          startButtonText={currentLesson?.startButtonText}
+        />;
       case LessonStage.PHRASE_INTRO:
         return <PhraseIntroduction onComplete={() => handleStageComplete(LessonStage.PHRASE_INTRO)} />;
       case LessonStage.SIMPLE_PHRASE_PRACTICE:
