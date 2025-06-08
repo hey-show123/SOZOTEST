@@ -494,6 +494,103 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     });
   };
 
+  // レッスンデータをJSONファイルとしてエクスポート
+  const handleExportLessons = () => {
+    try {
+      // JSONデータを作成
+      const jsonData = JSON.stringify(lessons, null, 2);
+      
+      // Blobを作成
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      
+      // ダウンロードリンクを作成
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sozo-lessons-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // リンクをクリックしてダウンロード
+      document.body.appendChild(a);
+      a.click();
+      
+      // クリーンアップ
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
+      
+      alert('レッスンデータのエクスポートが完了しました。');
+    } catch (error) {
+      console.error('エクスポートエラー:', error);
+      alert('エクスポート中にエラーが発生しました。');
+    }
+  };
+  
+  // ファイル選択のための参照
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // ファイル選択ダイアログを開く
+  const handleOpenImportDialog = () => {
+    if (importFileInputRef.current) {
+      importFileInputRef.current.click();
+    }
+  };
+  
+  // レッスンデータをJSONファイルからインポート
+  const handleImportLessons = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonData = event.target?.result as string;
+        const importedLessons = JSON.parse(jsonData) as Lesson[];
+        
+        // バリデーション（最低限の型チェック）
+        if (!Array.isArray(importedLessons)) {
+          throw new Error('インポートされたデータはレッスンの配列ではありません。');
+        }
+        
+        // 各レッスンが必要なプロパティを持っているか確認
+        importedLessons.forEach((lesson, index) => {
+          if (!lesson.id || !lesson.title || !lesson.level || !Array.isArray(lesson.tags)) {
+            throw new Error(`レッスン #${index + 1} に必要なプロパティがありません。`);
+          }
+        });
+        
+        // インポート前に確認
+        if (window.confirm(`${importedLessons.length}件のレッスンをインポートします。既存のレッスンデータは上書きされます。よろしいですか？`)) {
+          setLessons(importedLessons);
+          localStorage.setItem('lessons', jsonData);
+          alert('レッスンデータのインポートが完了しました。');
+          
+          // 現在選択中のレッスンがあれば更新
+          if (currentLesson && importedLessons.length > 0) {
+            const foundLesson = importedLessons.find(l => l.id === currentLesson.id);
+            if (foundLesson) {
+              setCurrentLesson(foundLesson);
+              onSelectLesson(foundLesson);
+            } else {
+              setCurrentLesson(importedLessons[0]);
+              onSelectLesson(importedLessons[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('インポートエラー:', error);
+        alert(`インポート中にエラーが発生しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
+      }
+      
+      // ファイル入力をリセット
+      if (importFileInputRef.current) {
+        importFileInputRef.current.value = '';
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
   return (
     <div className="w-full">
       {(isAdding || isEditing) ? (
@@ -813,15 +910,48 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">レッスン一覧</h2>
-            <button
-              onClick={handleStartAdd}
-              className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white text-sm flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-              </svg>
-              新規追加
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleExportLessons}
+                className="px-3 py-1 bg-blue-500 rounded hover:bg-blue-600 text-white text-sm flex items-center"
+                title="レッスンデータをJSONファイルとしてエクスポート"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                  <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                  <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                </svg>
+                エクスポート
+              </button>
+              <button
+                onClick={handleOpenImportDialog}
+                className="px-3 py-1 bg-purple-500 rounded hover:bg-purple-600 text-white text-sm flex items-center"
+                title="JSONファイルからレッスンデータをインポート"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                  <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                  <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                </svg>
+                インポート
+              </button>
+              <button
+                onClick={handleStartAdd}
+                className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white text-sm flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+                新規追加
+              </button>
+              
+              {/* 非表示のファイル入力フィールド */}
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImportLessons}
+              />
+            </div>
           </div>
           
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
