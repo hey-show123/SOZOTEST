@@ -115,10 +115,16 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     tags: '',
     keyPhraseText: '',
     keyPhraseTranslation: '',
-    dialogueText: '',
-    goalsText: '', // 目標のテキスト（1行に1つの目標）
-    headerTitle: '', // ヘッダータイトル
-    startButtonText: '' // 開始ボタンのテキスト
+    dialogueText: '', // 古い形式のダイアログテキスト（互換性のために残す）
+    dialogueTurns: [] as {
+      role: 'staff' | 'customer';
+      text: string;
+      translation: string;
+      turnNumber: number;
+    }[], // 新しい構造化されたダイアログデータ
+    goalsText: '', 
+    headerTitle: '',
+    startButtonText: ''
   });
 
   // コンポーネントマウント時にローカルストレージからレッスンを読み込む
@@ -173,6 +179,12 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       dialogueText: DEFAULT_DIALOGUE.map(turn => 
         `${turn.role}: "${turn.text}" - "${turn.translation}"`
       ).join('\n'),
+      dialogueTurns: DEFAULT_DIALOGUE.map(turn => ({
+        role: turn.role,
+        text: turn.text,
+        translation: turn.translation,
+        turnNumber: turn.turnNumber
+      })),
       goalsText: DEFAULT_LESSONS[0].goals?.map(goal => goal.text).join('\n') || '',
       headerTitle: DEFAULT_LESSONS[0].headerTitle || '',
       startButtonText: DEFAULT_LESSONS[0].startButtonText || 'レッスン開始'
@@ -208,6 +220,17 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       keyPhraseText: lesson.keyPhrase?.text || DEFAULT_KEY_PHRASE.text,
       keyPhraseTranslation: lesson.keyPhrase?.translation || DEFAULT_KEY_PHRASE.translation,
       dialogueText,
+      dialogueTurns: lesson.dialogueTurns?.map(turn => ({
+        role: turn.role,
+        text: turn.text,
+        translation: turn.translation,
+        turnNumber: turn.turnNumber
+      })) || DEFAULT_DIALOGUE.map(turn => ({
+        role: turn.role,
+        text: turn.text,
+        translation: turn.translation,
+        turnNumber: turn.turnNumber
+      })),
       goalsText,
       headerTitle: lesson.headerTitle || DEFAULT_LESSONS[0].headerTitle || '',
       startButtonText: lesson.startButtonText || DEFAULT_LESSONS[0].startButtonText || 'レッスン開始'
@@ -260,35 +283,47 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       return;
     }
 
-    // ダイアログデータの解析
     let dialogueTurns: DialogueTurn[] = [];
-    try {
-      // 各行を解析
-      const lines = formData.dialogueText.split('\n').filter(line => line.trim());
-      dialogueTurns = lines.map((line, index) => {
-        // パターン: role: "text" - "translation"
-        const roleMatch = line.match(/^(staff|customer):/i);
-        if (!roleMatch) throw new Error(`行 ${index + 1} の役割が無効です。'staff:' または 'customer:' で始める必要があります`);
-        
-        const role = roleMatch[1].toLowerCase() as 'staff' | 'customer';
-        
-        // テキストと翻訳を抽出
-        const textMatch = line.match(/"([^"]+)"\s*-\s*"([^"]+)"/);
-        if (!textMatch) throw new Error(`行 ${index + 1} のフォーマットが無効です。"テキスト" - "翻訳" の形式が必要です`);
-        
-        const text = textMatch[1];
-        const translation = textMatch[2];
-        
-        return {
-          role,
-          text,
-          translation,
-          turnNumber: index + 1
-        };
-      });
-    } catch (error) {
-      alert(`ダイアログの解析エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
-      return;
+    
+    // 構造化されたダイアログデータを使用（優先）
+    if (formData.dialogueTurns.length > 0) {
+      dialogueTurns = formData.dialogueTurns.map((turn, index) => ({
+        role: turn.role,
+        text: turn.text,
+        translation: turn.translation,
+        turnNumber: index + 1 // ターン番号を再設定して確実に連番にする
+      }));
+    } 
+    // 後方互換性のためにテキストからの解析も残す
+    else if (formData.dialogueText.trim()) {
+      try {
+        // 各行を解析
+        const lines = formData.dialogueText.split('\n').filter(line => line.trim());
+        dialogueTurns = lines.map((line, index) => {
+          // パターン: role: "text" - "translation"
+          const roleMatch = line.match(/^(staff|customer):/i);
+          if (!roleMatch) throw new Error(`行 ${index + 1} の役割が無効です。'staff:' または 'customer:' で始める必要があります`);
+          
+          const role = roleMatch[1].toLowerCase() as 'staff' | 'customer';
+          
+          // テキストと翻訳を抽出
+          const textMatch = line.match(/"([^"]+)"\s*-\s*"([^"]+)"/);
+          if (!textMatch) throw new Error(`行 ${index + 1} のフォーマットが無効です。"テキスト" - "翻訳" の形式が必要です`);
+          
+          const text = textMatch[1];
+          const translation = textMatch[2];
+          
+          return {
+            role,
+            text,
+            translation,
+            turnNumber: index + 1
+          };
+        });
+      } catch (error) {
+        alert(`ダイアログの解析エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
+        return;
+      }
     }
 
     // キーフレーズの検証
@@ -369,6 +404,94 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
         onSelectLesson(updatedLessons[0]);
       }
     }
+  };
+
+  // ダイアログターンの追加
+  const handleAddDialogueTurn = () => {
+    const newTurn = {
+      role: 'staff' as 'staff' | 'customer', 
+      text: '',
+      translation: '',
+      turnNumber: formData.dialogueTurns.length + 1
+    };
+    
+    setFormData({
+      ...formData,
+      dialogueTurns: [...formData.dialogueTurns, newTurn]
+    });
+  };
+
+  // ダイアログターンの削除
+  const handleRemoveDialogueTurn = (index: number) => {
+    const updatedTurns = formData.dialogueTurns.filter((_, i) => i !== index);
+    
+    // ターン番号を振り直す
+    const reorderedTurns = updatedTurns.map((turn, i) => ({
+      ...turn,
+      turnNumber: i + 1
+    }));
+    
+    setFormData({
+      ...formData,
+      dialogueTurns: reorderedTurns
+    });
+  };
+
+  // ダイアログターンの更新
+  const handleDialogueTurnChange = (index: number, field: 'role' | 'text' | 'translation', value: string) => {
+    const updatedTurns = [...formData.dialogueTurns];
+    if (field === 'role') {
+      updatedTurns[index].role = value as 'staff' | 'customer';
+    } else {
+      updatedTurns[index][field] = value;
+    }
+    
+    setFormData({
+      ...formData,
+      dialogueTurns: updatedTurns
+    });
+  };
+
+  // ダイアログターンの順序を変更（上へ移動）
+  const handleMoveDialogueTurnUp = (index: number) => {
+    if (index === 0) return; // 既に先頭の場合は何もしない
+    
+    const updatedTurns = [...formData.dialogueTurns];
+    const temp = updatedTurns[index];
+    updatedTurns[index] = updatedTurns[index - 1];
+    updatedTurns[index - 1] = temp;
+    
+    // ターン番号を振り直す
+    const reorderedTurns = updatedTurns.map((turn, i) => ({
+      ...turn,
+      turnNumber: i + 1
+    }));
+    
+    setFormData({
+      ...formData,
+      dialogueTurns: reorderedTurns
+    });
+  };
+
+  // ダイアログターンの順序を変更（下へ移動）
+  const handleMoveDialogueTurnDown = (index: number) => {
+    if (index === formData.dialogueTurns.length - 1) return; // 既に末尾の場合は何もしない
+    
+    const updatedTurns = [...formData.dialogueTurns];
+    const temp = updatedTurns[index];
+    updatedTurns[index] = updatedTurns[index + 1];
+    updatedTurns[index + 1] = temp;
+    
+    // ターン番号を振り直す
+    const reorderedTurns = updatedTurns.map((turn, i) => ({
+      ...turn,
+      turnNumber: i + 1
+    }));
+    
+    setFormData({
+      ...formData,
+      dialogueTurns: reorderedTurns
+    });
   };
 
   return (
@@ -505,22 +628,115 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
             <div className="border-t pt-4 mt-4">
               <h3 className="text-lg font-medium mb-3">ダイアログ設定</h3>
               <p className="text-sm text-gray-600 mb-2">
-                各行は <code className="bg-gray-100 px-1">role: "テキスト" - "翻訳"</code> の形式で入力してください。<br />
-                roleは「staff」または「customer」のいずれかです。
+                スタッフと顧客の会話を設定します。役割を選択し、会話文とその翻訳を入力してください。
               </p>
-              <div className="mb-4">
-                <textarea
-                  name="dialogueText"
-                  value={formData.dialogueText}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black font-mono text-sm"
-                  rows={10}
-                  placeholder='staff: "What would you like to do today?" - "今日はどうされますか？"
-customer: "A haircut please, my hair feels damaged." - "カットをお願いします。髪が傷んでいるように感じます。"
-staff: "Would you like to do a treatment as well?" - "トリートメントもされたいですか？"
-customer: "Sure." - "はい"'
-                />
+              
+              {/* カラムヘッダー */}
+              <div className="flex items-center mb-2 font-semibold text-sm">
+                <div className="w-20 text-center">役割</div>
+                <div className="flex-1 ml-2">英語テキスト</div>
+                <div className="flex-1 ml-2">日本語訳</div>
+                <div className="w-28 ml-2 text-center">操作</div>
               </div>
+              
+              <div className="mb-4 space-y-3">
+                {formData.dialogueTurns.map((turn, index) => (
+                  <div key={index} className="flex items-center space-x-2 p-2 border rounded bg-gray-50">
+                    <select
+                      value={turn.role}
+                      onChange={(e) => handleDialogueTurnChange(index, 'role', e.target.value)}
+                      className="w-20 p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                    >
+                      <option value="staff">スタッフ</option>
+                      <option value="customer">顧客</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={turn.text}
+                      onChange={(e) => handleDialogueTurnChange(index, 'text', e.target.value)}
+                      className="flex-1 p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                      placeholder="英語テキスト（例: Would you like to do a treatment as well?）"
+                    />
+                    <input
+                      type="text"
+                      value={turn.translation}
+                      onChange={(e) => handleDialogueTurnChange(index, 'translation', e.target.value)}
+                      className="flex-1 p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                      placeholder="日本語訳（例: トリートメントもされたいですか？）"
+                    />
+                    <div className="flex space-x-1">
+                      {/* 上に移動ボタン */}
+                      <button
+                        type="button"
+                        onClick={() => handleMoveDialogueTurnUp(index)}
+                        disabled={index === 0}
+                        className={`w-8 h-8 flex items-center justify-center rounded ${
+                          index === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        }`}
+                        title="上に移動"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path fillRule="evenodd" d="M8 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L7.5 2.707V14.5a.5.5 0 0 0 .5.5z"/>
+                        </svg>
+                      </button>
+                      
+                      {/* 下に移動ボタン */}
+                      <button
+                        type="button"
+                        onClick={() => handleMoveDialogueTurnDown(index)}
+                        disabled={index === formData.dialogueTurns.length - 1}
+                        className={`w-8 h-8 flex items-center justify-center rounded ${
+                          index === formData.dialogueTurns.length - 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        }`}
+                        title="下に移動"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path fillRule="evenodd" d="M8 1a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L7.5 13.293V1.5A.5.5 0 0 1 8 1z"/>
+                        </svg>
+                      </button>
+                      
+                      {/* 削除ボタン */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDialogueTurn(index)}
+                        className="w-8 h-8 flex items-center justify-center bg-red-100 text-red-600 rounded hover:bg-red-200"
+                        title="このターンを削除"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6z"/>
+                          <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                
+                {formData.dialogueTurns.length === 0 && (
+                  <div className="text-center py-4 text-gray-500 border rounded bg-gray-50">
+                    ダイアログが設定されていません。「ターンを追加」ボタンからダイアログを追加してください。
+                  </div>
+                )}
+                
+                <div className="flex justify-center mt-4">
+                  <button
+                    type="button"
+                    onClick={handleAddDialogueTurn}
+                    className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600 text-white flex items-center"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                      <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                    </svg>
+                    ターンを追加
+                  </button>
+                </div>
+              </div>
+              
+              {/* 従来の入力方法を非表示にし、互換性のために残す */}
+              <input 
+                type="hidden" 
+                name="dialogueText" 
+                value={formData.dialogueText} 
+              />
             </div>
             
             {/* 目標設定 */}
