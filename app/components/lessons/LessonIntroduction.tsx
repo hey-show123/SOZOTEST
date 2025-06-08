@@ -73,10 +73,10 @@ export default function LessonIntroduction({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-full p-4 sm:p-6 overflow-auto">
+    <div className="flex flex-col items-center justify-center min-h-full p-4 sm:p-6 overflow-auto lesson-container">
       <div className="w-full max-w-xl card-fancy bg-white dark:bg-slate-800 rounded-3xl p-4 sm:p-8 slide-in-up overflow-hidden">
         {/* グラデーションのタイトル部分 - モバイル対応 */}
-        <div className="gradient-flow text-white rounded-2xl p-4 sm:p-6 -mt-8 sm:-mt-16 mb-6 sm:mb-8 shadow-lg transform -rotate-1 relative">
+        <div className="gradient-flow text-white rounded-2xl p-4 sm:p-6 mt-4 sm:mt-2 mb-6 sm:mb-8 shadow-lg transform -rotate-1 relative lesson-card-title">
           <div className="absolute inset-0 bg-black opacity-10 rounded-2xl"></div>
           <h1 className="text-2xl sm:text-3xl font-bold text-center relative z-10 break-words">
             {headerTitle}

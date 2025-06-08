@@ -427,3 +427,24 @@ body {
     background: #64748b;
   }
 }
+
+/* レッスンカード用のスタイル調整 */
+.lesson-card-title {
+  margin-top: 20px;
+  padding: 20px;
+  position: relative;
+  z-index: 10;
+}
+
+/* 斜めになっているカードヘッダーのスタイル調整 */
+.gradient-flow {
+  margin-top: 25px !important;
+  padding-top: 25px !important;
+  overflow: visible !important;
+}
+
+/* カードコンテナの余白調整 */
+.lesson-container {
+  padding-top: 30px;
+  padding-bottom: 30px;
+}

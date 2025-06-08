@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SOZOの教室 - ",
-  description: "英語学習のためのAI会話アシスタント",
+  description: "英語学習のためのSOZOの教室",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 

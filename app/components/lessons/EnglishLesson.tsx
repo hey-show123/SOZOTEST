@@ -274,7 +274,7 @@ export default function EnglishLesson() {
           </div>
           
           {/* 右側：レッスンコンテンツ（2/3の幅） */}
-          <div className="w-2/3 px-4 py-4 overflow-y-auto">
+          <div className="w-2/3 px-4 py-8 overflow-y-auto">
             {renderLessonContent()}
           </div>
         </div>
@@ -289,7 +289,7 @@ export default function EnglishLesson() {
           )}
           
           {/* レッスンコンテンツ（PDFが表示されている場合は高さ1/3、そうでない場合は全体） */}
-          <div className={`${showPDF ? 'h-1/3' : 'h-full'} px-4 py-4 overflow-y-auto`}>
+          <div className={`${showPDF ? 'h-1/3' : 'h-full'} px-4 py-8 overflow-y-auto`}>
             {renderLessonContent()}
           </div>
         </div>
