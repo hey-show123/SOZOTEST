@@ -36,7 +36,7 @@ function HomePage() {
       <header className="z-10 w-full max-w-5xl flex items-center justify-between mb-6 relative">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-violet-500/10 filter blur-xl rounded-xl"></div>
         <h1 className="w-full text-center py-4 px-6 text-xl font-bold bg-white/80 dark:bg-slate-800/80 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 glass-effect relative z-10">
-          <span className="bg-gradient-to-r from-blue-600 to-violet-600 text-transparent bg-clip-text font-extrabold">AI会話アシスタント</span>
+          <span className="bg-gradient-to-r from-blue-600 to-violet-600 text-transparent bg-clip-text font-extrabold">SOZOの教室</span>
           <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-violet-500 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
         </h1>
