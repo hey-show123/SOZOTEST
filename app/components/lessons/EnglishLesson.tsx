@@ -2,29 +2,30 @@
 
 import { useState, useEffect } from 'react';
 import LessonIntroduction from './LessonIntroduction';
+import PhraseIntroduction from './PhraseIntroduction';
 import PhrasePractice from './PhrasePractice';
 import AllInOnePhrasePractice from './AllInOnePhrasePractice';
 import SimplePhrasePractice from './SimplePhrasePractice';
+import DialogueIntroduction from './DialogueIntroduction';
 import DialoguePractice from './DialoguePractice';
 import AllInOneDialoguePractice from './AllInOneDialoguePractice';
 import InteractiveDialoguePractice from './InteractiveDialoguePractice';
 import VocabularyPractice from './VocabularyPractice';
-import QuestionTime from './QuestionTime';
 import ChatSettings from '../ChatSettings';
-import PDFViewer from '../PDFViewer';
 import LessonManager, { Lesson } from './LessonManager';
 
 // レッスンステージの設定
 enum LessonStage {
   INTRODUCTION,
-  SIMPLE_PHRASE_PRACTICE,      // 追加: 今日の一言（今回の実装）
+  PHRASE_INTRO,             // 追加: フレーズ導入画面
+  SIMPLE_PHRASE_PRACTICE,   // 今日の一言
   ALL_IN_ONE_PHRASE_PRACTICE,  // 複数フレーズ一括練習
   PHRASE_PRACTICE,             // 従来の複数ページフレーズ練習
+  DIALOGUE_INTRO,              // 追加: 会話練習の導入画面
   INTERACTIVE_DIALOGUE_PRACTICE, // 追加: 対話形式の会話練習
   ALL_IN_ONE_DIALOGUE_PRACTICE, // 1ページで完結する会話練習
   DIALOGUE_PRACTICE,           // 従来の複数ページ会話練習
   VOCABULARY_PRACTICE,
-  QUESTION_TIME,
   COMPLETED
 }
 
@@ -35,9 +36,9 @@ export default function EnglishLesson() {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [currentPdfUrl, setCurrentPdfUrl] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(false);
-  const [useSimplifiedUI, setUseSimplifiedUI] = useState(true); // デフォルトで簡易UI（1ページ版）を使用
-  const [useSinglePhraseMode, setUseSinglePhraseMode] = useState(true); // デフォルトで単一キーフレーズモード
-  const [useInteractiveMode, setUseInteractiveMode] = useState(true); // デフォルトで対話形式の会話練習を使用
+  // linterエラーを避けるため、コメントアウト
+  // const useSimplifiedUI = true; // デフォルトで簡易UI（1ページ版）を使用
+  // const useInteractiveMode = true; // デフォルトで対話形式の会話練習を使用
 
   // 画面サイズのチェック
   useEffect(() => {
@@ -53,6 +54,33 @@ export default function EnglishLesson() {
     };
   }, []);
 
+  // セッションストレージからPDFのURLを読み込む
+  useEffect(() => {
+    try {
+      const savedPdfUrl = sessionStorage.getItem('currentLessonPdf');
+      if (savedPdfUrl) {
+        setCurrentPdfUrl(savedPdfUrl);
+        setShowPDF(true);
+      }
+      
+      // レッスンIDが保存されていれば、対応するレッスンを特定
+      const savedLessonId = sessionStorage.getItem('currentLessonId');
+      if (savedLessonId) {
+        const savedLessons = localStorage.getItem('lessons');
+        if (savedLessons) {
+          const lessons = JSON.parse(savedLessons) as Lesson[];
+          const foundLesson = lessons.find(l => l.id === savedLessonId);
+          if (foundLesson) {
+            setCurrentLesson(foundLesson);
+            setShowLessonManager(false);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('保存されたPDFパスの読み込みエラー:', error);
+    }
+  }, []);
+
   // レッスン選択時のハンドラ
   const handleSelectLesson = (lesson: Lesson) => {
     setCurrentLesson(lesson);
@@ -66,18 +94,21 @@ export default function EnglishLesson() {
   };
   
   const handleStageComplete = (stage: LessonStage) => {
-    // 導入からは単一今日の一言へ進む（新しい要望）
+    // 導入からはフレーズ導入へ進む
     if (stage === LessonStage.INTRODUCTION) {
+      setCurrentStage(LessonStage.PHRASE_INTRO);
+    }
+    // フレーズ導入からは単一今日の一言へ進む
+    else if (stage === LessonStage.PHRASE_INTRO) {
       setCurrentStage(LessonStage.SIMPLE_PHRASE_PRACTICE);
     }
-    // 単一今日の一言からは会話練習へ
+    // 単一今日の一言からは会話導入へ
     else if (stage === LessonStage.SIMPLE_PHRASE_PRACTICE) {
-      // 対話形式を使用するかどうかで分岐
-      if (useInteractiveMode) {
-        setCurrentStage(LessonStage.INTERACTIVE_DIALOGUE_PRACTICE);
-      } else {
-        setCurrentStage(useSimplifiedUI ? LessonStage.ALL_IN_ONE_DIALOGUE_PRACTICE : LessonStage.DIALOGUE_PRACTICE);
-      }
+      setCurrentStage(LessonStage.DIALOGUE_INTRO);
+    }
+    // 会話導入からは対話形式の会話練習へ
+    else if (stage === LessonStage.DIALOGUE_INTRO) {
+      setCurrentStage(LessonStage.INTERACTIVE_DIALOGUE_PRACTICE);
     }
     // 対話形式の会話練習からは語彙練習へ
     else if (stage === LessonStage.INTERACTIVE_DIALOGUE_PRACTICE) {
@@ -95,6 +126,10 @@ export default function EnglishLesson() {
     }
     else if (stage === LessonStage.DIALOGUE_PRACTICE) {
       setCurrentStage(LessonStage.VOCABULARY_PRACTICE);
+    }
+    // 語彙練習からは完了画面へ
+    else if (stage === LessonStage.VOCABULARY_PRACTICE) {
+      setCurrentStage(LessonStage.COMPLETED);
     }
     // それ以外は次のステージへ
     else {
@@ -114,24 +149,6 @@ export default function EnglishLesson() {
   // レッスンマネージャーの表示切替
   const toggleLessonManager = () => {
     setShowLessonManager(!showLessonManager);
-  };
-  
-  // UI切り替え
-  const toggleUIMode = () => {
-    setUseSimplifiedUI(!useSimplifiedUI);
-    
-    // 現在のステージに応じて、対応するUIに切り替える
-    if (currentStage === LessonStage.PHRASE_PRACTICE || currentStage === LessonStage.ALL_IN_ONE_PHRASE_PRACTICE) {
-      setCurrentStage(useSimplifiedUI ? LessonStage.PHRASE_PRACTICE : LessonStage.ALL_IN_ONE_PHRASE_PRACTICE);
-    }
-    else if (currentStage === LessonStage.DIALOGUE_PRACTICE || currentStage === LessonStage.ALL_IN_ONE_DIALOGUE_PRACTICE) {
-      setCurrentStage(useSimplifiedUI ? LessonStage.DIALOGUE_PRACTICE : LessonStage.ALL_IN_ONE_DIALOGUE_PRACTICE);
-    }
-  };
-  
-  // 対話モード切り替え
-  const toggleInteractiveMode = () => {
-    setUseInteractiveMode(!useInteractiveMode);
   };
 
   // PDFビューアー部分
@@ -175,25 +192,32 @@ export default function EnglishLesson() {
     switch (currentStage) {
       case LessonStage.INTRODUCTION:
         return <LessonIntroduction onComplete={() => handleStageComplete(LessonStage.INTRODUCTION)} />;
+      case LessonStage.PHRASE_INTRO:
+        return <PhraseIntroduction onComplete={() => handleStageComplete(LessonStage.PHRASE_INTRO)} />;
       case LessonStage.SIMPLE_PHRASE_PRACTICE:
         return <SimplePhrasePractice 
           onComplete={() => handleStageComplete(LessonStage.SIMPLE_PHRASE_PRACTICE)} 
           avatarImage="/images/_i_icon_15596_icon_155960_256.png" 
+          keyPhrase={currentLesson?.keyPhrase}
         />;
+      case LessonStage.DIALOGUE_INTRO:
+        return <DialogueIntroduction onComplete={() => handleStageComplete(LessonStage.DIALOGUE_INTRO)} />;
       case LessonStage.ALL_IN_ONE_PHRASE_PRACTICE:
         return <AllInOnePhrasePractice onComplete={() => handleStageComplete(LessonStage.ALL_IN_ONE_PHRASE_PRACTICE)} />;
       case LessonStage.PHRASE_PRACTICE:
         return <PhrasePractice onComplete={() => handleStageComplete(LessonStage.PHRASE_PRACTICE)} />;
       case LessonStage.INTERACTIVE_DIALOGUE_PRACTICE:
-        return <InteractiveDialoguePractice onComplete={() => handleStageComplete(LessonStage.INTERACTIVE_DIALOGUE_PRACTICE)} />;
+        return <InteractiveDialoguePractice 
+          onComplete={() => handleStageComplete(LessonStage.INTERACTIVE_DIALOGUE_PRACTICE)}
+          dialogueTurns={currentLesson?.dialogueTurns}
+          lessonTitle={currentLesson?.title}
+        />;
       case LessonStage.ALL_IN_ONE_DIALOGUE_PRACTICE:
         return <AllInOneDialoguePractice onComplete={() => handleStageComplete(LessonStage.ALL_IN_ONE_DIALOGUE_PRACTICE)} />;
       case LessonStage.DIALOGUE_PRACTICE:
         return <DialoguePractice onComplete={() => handleStageComplete(LessonStage.DIALOGUE_PRACTICE)} />;
       case LessonStage.VOCABULARY_PRACTICE:
         return <VocabularyPractice onComplete={() => handleStageComplete(LessonStage.VOCABULARY_PRACTICE)} />;
-      case LessonStage.QUESTION_TIME:
-        return <QuestionTime onComplete={() => handleStageComplete(LessonStage.QUESTION_TIME)} />;
       case LessonStage.COMPLETED:
         return (
           <div className="flex flex-col items-center justify-center h-full p-6">

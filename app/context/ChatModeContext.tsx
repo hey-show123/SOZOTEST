@@ -9,6 +9,13 @@ type ChatModeContextType = {
   setMode: (mode: ChatMode) => void;
 };
 
+// カスタムイベントの型定義
+declare global {
+  interface WindowEventMap {
+    'set-lesson-mode': CustomEvent<{ mode: ChatMode }>;
+  }
+}
+
 const ChatModeContext = createContext<ChatModeContextType | undefined>(undefined);
 
 export function ChatModeProvider({ children }: { children: ReactNode }) {
@@ -44,6 +51,26 @@ export function ChatModeProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [mode, isClient]);
+
+  // カスタムイベントリスナーの登録（レッスンページからのモード設定用）
+  useEffect(() => {
+    if (!isClient) return;
+
+    const handleSetLessonMode = (event: CustomEvent<{ mode: ChatMode }>) => {
+      console.log('モード変更イベントを受信:', event.detail.mode);
+      if (event.detail.mode) {
+        setMode(event.detail.mode);
+      }
+    };
+
+    // イベントリスナーの登録
+    window.addEventListener('set-lesson-mode', handleSetLessonMode as EventListener);
+
+    // クリーンアップ
+    return () => {
+      window.removeEventListener('set-lesson-mode', handleSetLessonMode as EventListener);
+    };
+  }, [isClient]);
 
   return (
     <ChatModeContext.Provider value={{ mode, setMode }}>

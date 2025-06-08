@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import AudioRecorder from './AudioRecorder';
 import AudioPlayer from './AudioPlayer';
-import AnimatedAvatar from './AnimatedAvatar';
 import { useChatMode } from '../context/ChatModeContext';
 import EnglishLesson from './lessons/EnglishLesson';
 import ChatSettings from './ChatSettings';
@@ -35,6 +34,14 @@ const DEFAULT_MESSAGES = {
   'ai-lesson': 'Hello! I\'m your English conversation tutor. How can I help you today?'
 };
 
+// カスタムイベントの型定義
+declare global {
+  interface WindowEventMap {
+    'reset-chat': CustomEvent;
+    'start-lesson': CustomEvent;
+  }
+}
+
 export default function Chat() {
   const { mode } = useChatMode();
   const { ttsModel, ttsPromptSettings } = useModel();
@@ -52,7 +59,6 @@ export default function Chat() {
   const [isClient, setIsClient] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initialMessageSentRef = useRef(false);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
   // クライアントサイドでのみ実行される処理
   useEffect(() => {
@@ -64,7 +70,20 @@ export default function Chat() {
     if (!isClient) return;
     
     console.log('Mode changed to:', mode);
-    setMessages([{ role: 'system', content: SYSTEM_PROMPTS[mode] }]);
+    
+    // レッスン固有のシステムプロンプトがあれば使用する
+    let systemPrompt = SYSTEM_PROMPTS[mode];
+    try {
+      const customPrompt = sessionStorage.getItem('currentLessonPrompt');
+      if (customPrompt && mode === 'ai-lesson') {
+        systemPrompt = customPrompt;
+        console.log('レッスン固有のシステムプロンプトを使用します');
+      }
+    } catch (error) {
+      console.error('カスタムプロンプトの取得エラー:', error);
+    }
+    
+    setMessages([{ role: 'system', content: systemPrompt }]);
     setCurrentTtsText('');
     setShowTranslations({});
     initialMessageSentRef.current = false;
@@ -90,6 +109,26 @@ export default function Chat() {
       window.removeEventListener('reset-chat', handleReset);
     };
   }, [isClient]);
+
+  // レッスン開始イベントのリスナー
+  useEffect(() => {
+    if (!isClient) return;
+
+    const handleStartLesson = () => {
+      console.log('自動レッスン開始イベントを受信');
+      if (!sessionStarted && !initialMessageSentRef.current) {
+        startSession();
+      }
+    };
+
+    // イベントリスナーの登録
+    window.addEventListener('start-lesson', handleStartLesson);
+    
+    // クリーンアップ
+    return () => {
+      window.removeEventListener('start-lesson', handleStartLesson);
+    };
+  }, [isClient, sessionStarted]);
 
   // セッション開始時に初期メッセージを取得
   const startSession = () => {
@@ -144,17 +183,9 @@ export default function Chat() {
     if (!isClient) return;
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'assistant') {
-      console.log('アシスタントメッセージを検出、TTS再生準備');
       setCurrentTtsText(lastMessage.content);
     }
   }, [messages, isClient]);
-  
-  // TTSの再生状態をコンソールに出力（デバッグ用）
-  useEffect(() => {
-    if (isClient) {
-      console.log('音声再生状態:', isAudioPlaying ? '再生中' : '停止中');
-    }
-  }, [isAudioPlaying, isClient]);
 
   // 翻訳表示の切り替え
   const toggleTranslation = async (index: number) => {
@@ -328,14 +359,7 @@ export default function Chat() {
     if (message.audioUrl) {
       // キャッシュされた音声を再生
       const audio = new Audio(message.audioUrl);
-      setIsAudioPlaying(true);
       audio.play().catch(error => console.error('音声再生エラー:', error));
-      
-      // 音声の再生終了時にフラグをリセット
-      audio.onended = () => {
-        console.log('音声再生終了');
-        setIsAudioPlaying(false);
-      };
     } else {
       // 音声がキャッシュされていない場合はテキストを使って再生
       setCurrentTtsText(message.content);
@@ -365,14 +389,9 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[80vh] max-w-5xl mx-auto bg-white rounded-lg shadow-md relative">
+    <div className="flex flex-col h-[80vh] max-w-5xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl card-fancy">
       {/* TTSプレーヤー（非表示） */}
-      <AudioPlayer 
-        text={currentTtsText} 
-        autoPlay={true} 
-        isPlaying={isAudioPlaying}
-        setIsPlaying={setIsAudioPlaying}
-      />
+      <AudioPlayer text={currentTtsText} autoPlay={true} />
 
       {/* AIレッスンモードの場合はレッスンコンポーネントを表示 */}
       {mode === 'ai-lesson' ? (
@@ -380,75 +399,72 @@ export default function Chat() {
       ) : (
         // フリートークモードの場合は通常のチャットを表示
         <>
-          {/* 背景アバター - 会話開始後のみ表示 */}
-          {sessionStarted && <AnimatedAvatar isPlaying={isAudioPlaying} />}
-          
-          <div className="p-2 flex justify-end z-10 relative">
+          <div className="p-3 flex justify-end">
             <ChatSettings />
           </div>
           
           {/* チャットエリアとマイクボタンの配置 */}
-          <div className="flex-1 flex flex-col relative z-10">
-            {/* チャット履歴エリア - 上部に十分なスペースを確保 */}
-            {sessionStarted && <div className="h-[40%]"></div>}
-            <div className={`${sessionStarted ? 'h-[60%]' : 'h-full'} p-4 overflow-y-auto bg-white bg-opacity-90 rounded-t-3xl`}>
+          <div className="flex-1 flex flex-col relative">
+            {/* チャット履歴エリア */}
+            <div className="flex-1 p-4 overflow-y-auto bg-gray-50/50 dark:bg-slate-900/50 z-10">
               {sessionStarted ? (
                 // セッション開始後の会話表示
                 <>
                   {messages.filter(msg => msg.role !== 'system').map((message, index) => (
                     <div
                       key={index}
-                      className={`mb-4 ${
+                      className={`mb-6 ${
                         message.role === 'user' ? 'text-right' : 'text-left'
                       }`}
                     >
-                      {message.role === 'assistant' && (
-                        <div className="flex items-start">
-                          <div
-                            className="p-3 rounded-lg max-w-[80%] bg-gray-200 text-gray-800"
-                          >
-                            {message.content}
-                            <div className="flex items-center mt-1 space-x-2">
-                              <button 
-                                onClick={() => playMessageAudio(message)} 
-                                className="text-sm text-gray-800 hover:text-black flex items-center gap-1 border border-gray-300 rounded px-2 py-1"
-                                title="もう一度読み上げる"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                  <path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/>
-                                  <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/>
-                                  <path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 9.025 8A3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/>
-                                </svg>
-                                <span>音声</span>
-                              </button>
-                              
-                              <button 
-                                onClick={() => toggleTranslation(index)}
-                                className="text-sm text-gray-800 hover:text-black flex items-center gap-1 border border-gray-300 rounded px-2 py-1"
-                                title="翻訳を表示/非表示"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                  <path fillRule="evenodd" d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.111-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2V5z"/>
-                                </svg>
-                                <span>翻訳</span>
-                              </button>
-                            </div>
+                      <div
+                        className={`inline-block p-4 rounded-2xl max-w-[85%] shadow-md transition-all duration-300 ${
+                          message.role === 'user'
+                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white slide-in-left'
+                            : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-slate-700 slide-in-right'
+                        }`}
+                      >
+                        <div className="text-base font-normal leading-relaxed">{message.content}</div>
+                        {message.role === 'assistant' && (
+                          <div className="flex items-center mt-3 space-x-2">
+                            <button 
+                              onClick={() => playMessageAudio(message)} 
+                              className="text-xs flex items-center gap-1 border border-gray-200 dark:border-slate-600 rounded-full px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                              title="もう一度読み上げる"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/>
+                                <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/>
+                                <path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 9.025 8A3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/>
+                              </svg>
+                              <span>音声</span>
+                            </button>
+                            
+                            <button 
+                              onClick={() => toggleTranslation(index)}
+                              className="text-xs flex items-center gap-1 border border-gray-200 dark:border-slate-600 rounded-full px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                              title="翻訳を表示/非表示"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                                <path fillRule="evenodd" d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.111-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2V5z"/>
+                              </svg>
+                              <span>翻訳</span>
+                            </button>
                           </div>
-                        </div>
-                      )}
-                      
-                      {message.role === 'user' && (
-                        <div
-                          className="inline-block p-3 rounded-lg max-w-[80%] bg-blue-500 text-white"
-                        >
-                          {message.content}
-                        </div>
-                      )}
+                        )}
+                      </div>
                       
                       {/* 翻訳テキストの表示 */}
                       {message.role === 'assistant' && showTranslations[index] && (
-                        <div className="mt-1 text-left text-sm text-gray-800 px-3">
-                          {message.translation ? message.translation : '翻訳中...'}
+                        <div className="mt-2 text-left text-sm text-gray-600 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm max-w-[85%] fade-in">
+                          {message.translation ? message.translation : (
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                              <span className="text-sm">翻訳中...</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -457,18 +473,18 @@ export default function Chat() {
               ) : (
                 // セッション開始前の案内表示
                 <div className="flex flex-col items-center justify-center h-full">
-                  <div className="text-center mb-6">
-                    <h2 className="text-xl font-semibold mb-2 text-black">
+                  <div className="text-center mb-6 max-w-md p-6 bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-700 neumorph dark:neumorph-dark">
+                    <h2 className="text-2xl font-semibold mb-4 text-gradient">
                       {mode === 'free-talk' ? 'フリートークモード' : 'AIレッスンモード'}
                     </h2>
-                    <p className="text-black mb-4">
+                    <p className="text-gray-700 dark:text-gray-300 mb-6 leading-relaxed">
                       {mode === 'free-talk' 
                         ? '自由な英会話を楽しむモードです。美容院のお客さんとして英語で会話できます。' 
                         : '英会話学習のためのAIレッスンモードです。英語のスキルアップをサポートします。'}
                     </p>
                     <button
                       onClick={startSession}
-                      className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-full hover:shadow-lg transition-all duration-300 font-medium"
                     >
                       会話を始める
                     </button>
@@ -478,11 +494,12 @@ export default function Chat() {
               
               {isLoading && (
                 <div className="text-left mb-4">
-                  <div className="p-3 rounded-lg bg-gray-200 text-gray-800">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="inline-block p-4 rounded-2xl bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-200 shadow-md border border-gray-100 dark:border-slate-700 max-w-[70%] relative">
+                    <div className="absolute -top-2 -left-2 w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="flex space-x-3">
+                      <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce"></div>
+                      <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -492,12 +509,12 @@ export default function Chat() {
             
             {/* マイクボタンを中央下部に固定配置 */}
             {sessionStarted && (
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center z-20">
-                <div className="flex flex-col items-center bg-white bg-opacity-90 p-3 rounded-full shadow-lg">
-                  <div className="mb-2 text-center text-sm text-gray-700 font-medium">
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center z-50">
+                <div className="flex flex-col items-center bg-white/90 dark:bg-slate-800/90 p-3 rounded-full shadow-lg backdrop-blur-sm z-50">
+                  <div className="mb-2 text-center text-sm text-gray-700 dark:text-gray-300 font-medium">
                     {isRecording ? "話し終わったらマイクをタップ" : "マイクをタップして話す"}
                   </div>
-                  <div className="transform scale-150">
+                  <div className="transform scale-150 z-50">
                     <AudioRecorder 
                       onTranscription={handleTranscription} 
                       isRecording={isRecording}
@@ -511,9 +528,9 @@ export default function Chat() {
 
           {/* 初期状態のみ表示 */}
           {!sessionStarted && (
-            <div className="p-4 border-t flex justify-center items-center relative z-10">
-              <div className="text-center text-black">
-                「会話を始める」ボタンをクリックして会話を開始してください
+            <div className="p-4 border-t flex justify-center items-center bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700">
+              <div className="text-center text-gray-700 dark:text-gray-300 py-2 px-4 rounded-full bg-white/70 dark:bg-slate-900/70 shadow-inner backdrop-blur-sm">
+                <span className="font-medium">「会話を始める」ボタンをクリックして会話を開始してください</span>
               </div>
             </div>
           )}

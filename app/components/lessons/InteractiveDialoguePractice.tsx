@@ -3,184 +3,137 @@
 import { useState, useEffect, useRef } from 'react';
 import AudioPlayer from '../AudioPlayer';
 import AudioRecorder from '../AudioRecorder';
+import { DialogueTurn } from './LessonManager';
 
 interface InteractiveDialoguePracticeProps {
   onComplete: () => void;
+  dialogueTurns?: DialogueTurn[];
+  lessonTitle?: string;
 }
-
-type DialogueScene = {
-  id: number;
-  title: string;
-  description: string;
-  conversation: DialogueLine[];
-};
 
 type DialogueLine = {
   role: 'staff' | 'customer';
   text: string;
   translation: string;
   isKeyPhrase?: boolean;
+  turnNumber?: number;
 };
 
-// 会話シナリオデータ
-const dialogueScenes: DialogueScene[] = [
+// 会話履歴用の型定義
+type ConversationItem = {
+  role: 'staff' | 'customer';
+  text: string;
+  translation: string;
+  isUser?: boolean;
+};
+
+// デフォルトの会話シナリオデータ
+const DEFAULT_DIALOGUE: DialogueTurn[] = [
   {
-    id: 1,
-    title: "ヘアサロンでの会話",
-    description: "美容師とお客様の会話です。追加サービスの提案を練習しましょう。",
-    conversation: [
-      {
-        role: 'staff',
-        text: "What would you like to do today?",
-        translation: "今日はどうされますか？"
-      },
-      {
-        role: 'customer',
-        text: "A haircut please, my hair feels damaged.",
-        translation: "カットでお願いします。髪がダメージしているように感じます。"
-      },
-      {
-        role: 'staff',
-        text: "OK, would you like to do a treatment as well?",
-        translation: "わかりました。トリートメントもされますか？",
-        isKeyPhrase: true
-      },
-      {
-        role: 'customer',
-        text: "Sure.",
-        translation: "はい、お願いします。"
-      }
-    ]
+    role: 'staff',
+    text: "What would you like to do today?",
+    translation: "今日はどうされますか？",
+    turnNumber: 1
+  },
+  {
+    role: 'customer',
+    text: "A haircut please, my hair feels damaged.",
+    translation: "カットをお願いします。髪が傷んでいるように感じます。",
+    turnNumber: 2
+  },
+  {
+    role: 'staff',
+    text: "Would you like to do a treatment as well?",
+    translation: "トリートメントもされたいですか？",
+    turnNumber: 3
+  },
+  {
+    role: 'customer',
+    text: "Sure.",
+    translation: "はい",
+    turnNumber: 4
   }
 ];
 
-export default function InteractiveDialoguePractice({ onComplete }: InteractiveDialoguePracticeProps) {
-  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
-  const [currentLineIndex, setCurrentLineIndex] = useState(0);
-  const [userTranscription, setUserTranscription] = useState('');
+export default function InteractiveDialoguePractice({ 
+  onComplete, 
+  dialogueTurns, 
+  lessonTitle = 'レッスン: ヘアサロンでの会話' 
+}: InteractiveDialoguePracticeProps) {
+  // 使用するダイアログ（propsから受け取るか、デフォルト値を使用）
+  const dialogue = dialogueTurns || DEFAULT_DIALOGUE;
+
+  const [currentTurn, setCurrentTurn] = useState(1);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [completedScenes, setCompletedScenes] = useState<Set<number>>(new Set());
-  const [completedLines, setCompletedLines] = useState<Set<string>>(new Set());
-  const [conversationHistory, setConversationHistory] = useState<Array<{role: string; text: string; isUser?: boolean}>>([]);
-  const [waitingForCustomerResponse, setWaitingForCustomerResponse] = useState(false);
+  const [audioText, setAudioText] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [audioText, setAudioText] = useState('');
-  const [customerAudioPlayed, setCustomerAudioPlayed] = useState(false);
-  const [isExamplePlaying, setIsExamplePlaying] = useState(false);
-
+  const [conversationHistory, setConversationHistory] = useState<ConversationItem[]>([]);
+  
+  // 会話履歴の自動スクロール用のref
   const conversationEndRef = useRef<HTMLDivElement>(null);
 
-  // 現在のシーン
-  const currentScene = dialogueScenes[currentSceneIndex];
   // 現在の会話ライン
-  const currentLine = currentLineIndex < currentScene.conversation.length 
-    ? currentScene.conversation[currentLineIndex] 
-    : null;
-
+  const currentLine = dialogue.find(line => line.turnNumber === currentTurn);
+  
   // 会話履歴を自動スクロール
   useEffect(() => {
     if (conversationEndRef.current) {
       conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [conversationHistory]);
-
-  // コンポーネントがマウントされたら最初のセリフを表示
+  
+  // コンポーネントがマウントされたら初期設定
   useEffect(() => {
-    // すでに会話履歴がある場合は何もしない
-    if (conversationHistory.length > 0) return;
+    // 最初の指示を表示するための遅延
+    const timer = setTimeout(() => {
+      if (currentLine && currentLine.role === 'staff') {
+        // 最初はユーザーが話す番
+      }
+    }, 1000);
     
-    // 最初のラインがスタッフのものであることを確認
-    if (currentLine && currentLine.role === 'staff') {
-      setCurrentLineIndex(0);
-    }
-  }, []);
+    return () => clearTimeout(timer);
+  }, [currentLine]);
 
-  // シーンを完了としてマーク
-  const markSceneAsCompleted = (sceneId: number) => {
-    setCompletedScenes(prev => new Set([...prev, sceneId]));
-  };
-
-  // シーンを切り替える
-  const changeScene = (index: number) => {
-    if (index >= 0 && index < dialogueScenes.length) {
-      setCurrentSceneIndex(index);
-      setCurrentLineIndex(0);
-      setConversationHistory([]);
-      setCompletedLines(new Set());
-      setWaitingForCustomerResponse(false);
-      setCustomerAudioPlayed(false);
+  // 現在のターンが変わった時、お客さんのセリフなら自動再生
+  useEffect(() => {
+    if (currentLine && currentLine.role === 'customer') {
+      setTimeout(() => {
+        // お客さんのセリフを自動再生
+        setAudioText(currentLine.text);
+        setIsAudioPlaying(true);
+        
+        // 会話履歴に追加
+        setConversationHistory(prev => [
+          ...prev,
+          {
+            role: 'customer',
+            text: currentLine.text,
+            translation: currentLine.translation
+          }
+        ]);
+      }, 500);
     }
-  };
+  }, [currentTurn, currentLine]);
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
-    setIsExamplePlaying(false);
-    console.log("音声再生完了：", audioText);
     
-    // もし顧客のセリフを再生した後なら、次のスタッフのセリフに進む
-    if (waitingForCustomerResponse) {
-      setCustomerAudioPlayed(true);
-      setWaitingForCustomerResponse(false);
-      
-      // 次のラインが存在し、それがスタッフのものなら表示
-      if (currentLineIndex + 1 < currentScene.conversation.length) {
-        if (currentScene.conversation[currentLineIndex + 1].role === 'staff') {
+    // 顧客のセリフの再生が終わったら
+    if (currentLine && currentLine.role === 'customer') {
+      // 少し待ってから次のターンへ
+      setTimeout(() => {
+        if (currentTurn < dialogue.length) {
+          setCurrentTurn(currentTurn + 1);
+        } else {
+          // 会話完了、次のセクションへ
           setTimeout(() => {
-            setCurrentLineIndex(currentLineIndex + 1);
-          }, 1000); // 1秒後に次のスタッフセリフに進む
+            onComplete();
+          }, 1500);
         }
-      } else {
-        // 会話が終了した場合
-        markSceneAsCompleted(currentScene.id);
-      }
-    }
-  };
-
-  // 会話を進める
-  const advanceConversation = () => {
-    if (!currentLine) return;
-    
-    // 現在のラインが完了したとマーク
-    const lineKey = `${currentScene.id}-${currentLineIndex}`;
-    setCompletedLines(prev => new Set([...prev, lineKey]));
-    
-    if (currentLine.role === 'staff') {
-      // スタッフのセリフを発話した後、お客さんのセリフをAIが読む
-      if (currentLineIndex + 1 < currentScene.conversation.length) {
-        const nextLine = currentScene.conversation[currentLineIndex + 1];
-        if (nextLine.role === 'customer') {
-          // 会話履歴にお客さんのセリフを追加
-          setConversationHistory(prev => [
-            ...prev, 
-            { role: 'customer', text: nextLine.text }
-          ]);
-          
-          // お客さんのセリフを再生する準備
-          setCurrentLineIndex(currentLineIndex + 1);
-          setAudioText(nextLine.text); // 読み上げるテキストを設定
-          setCustomerAudioPlayed(false);
-          
-          // 少し遅延させてから音声再生を開始（UIの更新が完了するのを待つ）
-          setTimeout(() => {
-            setIsAudioPlaying(true);
-            setWaitingForCustomerResponse(true);
-          }, 500);
-        }
-      } else {
-        // 最後のスタッフセリフの場合は会話完了としてマーク
-        markSceneAsCompleted(currentScene.id);
-      }
-    } else if (currentLine.role === 'customer') {
-      // お客さんのセリフの後、次のスタッフのセリフへ
-      if (currentLineIndex + 1 < currentScene.conversation.length) {
-        setCurrentLineIndex(currentLineIndex + 1);
-      } else {
-        // 会話が終了した場合
-        markSceneAsCompleted(currentScene.id);
-      }
+      }, 1500);
     }
   };
 
@@ -188,7 +141,6 @@ export default function InteractiveDialoguePractice({ onComplete }: InteractiveD
   const handleTranscription = (text: string) => {
     if (!currentLine || !text || text.trim() === '') return;
     
-    setUserTranscription(text);
     setIsRecording(false);
     
     // フィードバックを計算
@@ -199,28 +151,36 @@ export default function InteractiveDialoguePractice({ onComplete }: InteractiveD
     setShowFeedback(true);
     
     // 発音の精度に基づいてフィードバックを表示し、次のアクションを決定
-    if (similarity > 0.7) {
+    if (similarity > 0.6) {  // 閾値を少し下げて許容度を高める
       setFeedbackMessage('素晴らしい発音です！');
       
-      // 会話履歴に追加して会話を進める
+      // 正しい発音の場合のみ会話履歴に追加
       setConversationHistory(prev => [
-        ...prev, 
-        { role: 'staff', text, isUser: true }
+        ...prev,
+        {
+          role: 'staff',
+          text: text,
+          translation: currentLine.translation,
+          isUser: true
+        }
       ]);
       
-      // フィードバック表示後、少し時間を置いて会話を進める
+      // フィードバック表示後、次の顧客のセリフへ
       setTimeout(() => {
         setShowFeedback(false);
-        advanceConversation();
-      }, 2000);
-    } else if (similarity > 0.4) {
-      setFeedbackMessage('良い発音です。もう少し練習が必要です。もう一度お試しください。');
-      // フィードバックを表示するだけで会話は進めない
-      setTimeout(() => {
-        setShowFeedback(false);
-      }, 3000);
+        if (currentTurn < dialogue.length) {
+          const nextTurn = currentTurn + 1;
+          setCurrentTurn(nextTurn);
+        } else {
+          // 会話完了、次のセクションへ
+          setTimeout(() => {
+            onComplete();
+          }, 1000);
+        }
+      }, 1500);
     } else {
-      setFeedbackMessage('もう一度挑戦してください。発音が正確ではありません。');
+      // 間違った発音の場合のフィードバック
+      setFeedbackMessage('発音が正確ではありません。もう一度お試しください。');
       // フィードバックを表示するだけで会話は進めない
       setTimeout(() => {
         setShowFeedback(false);
@@ -243,119 +203,89 @@ export default function InteractiveDialoguePractice({ onComplete }: InteractiveD
     return matchCount / Math.max(words1.length, words2.length);
   };
 
-  // すべてのシーンが完了したかチェック
-  const allScenesCompleted = completedScenes.size === dialogueScenes.length;
-
   // フレーズを再生
   const playPhrase = (text: string) => {
-    console.log("フレーズ再生:", text);
     setAudioText(text);
-    setIsExamplePlaying(true);
     setIsAudioPlaying(true);
   };
 
+  // スキップして次へ
+  const skipToNext = () => {
+    if (!currentLine) return;
+    
+    // スキップする場合も会話履歴に追加
+    setConversationHistory(prev => [
+      ...prev,
+      {
+        role: 'staff',
+        text: currentLine.text,
+        translation: currentLine.translation,
+        isUser: true
+      }
+    ]);
+    
+    if (currentTurn < dialogue.length) {
+      const nextTurn = currentTurn + 1;
+      setCurrentTurn(nextTurn);
+    } else {
+      // 会話完了、次のセクションへ
+      setTimeout(() => {
+        onComplete();
+      }, 1000);
+    }
+  };
+
   return (
-    <div className="w-full h-full p-4">
-      <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-        <h2 className="text-xl font-bold text-center mb-4 text-green-700">インタラクティブ会話練習</h2>
-
-        {/* シーン選択タブ */}
-        <div className="flex mb-4 border-b">
-          {dialogueScenes.map((scene, index) => (
-            <button
-              key={scene.id}
-              onClick={() => changeScene(index)}
-              className={`px-4 py-2 text-sm font-medium ${
-                currentSceneIndex === index 
-                  ? 'border-b-2 border-blue-500 text-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              } ${
-                completedScenes.has(scene.id) ? 'bg-green-50' : ''
-              }`}
-            >
-              {scene.title}
-              {completedScenes.has(scene.id) && (
-                <span className="ml-1 text-xs bg-green-500 text-white px-1 py-0.5 rounded-full">✓</span>
-              )}
-            </button>
-          ))}
+    <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-4 overflow-auto">
+      <div className="w-full max-w-xl bg-white rounded-lg shadow-md p-4 sm:p-6">
+        {/* レッスンタイトル */}
+        <div className="text-center mb-3 sm:mb-4">
+          <h1 className="text-xl sm:text-3xl font-bold mb-2 sm:mb-3 text-gray-800">{lessonTitle}</h1>
+          <p className="text-base sm:text-lg text-gray-700 font-medium">
+            あなたはスタッフ役です。お客さんとやりとりしてみよう！
+          </p>
         </div>
 
-        {/* 現在の会話シーンの説明 */}
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-gray-700">{currentScene.description}</p>
-        </div>
-
-        {/* 会話履歴 */}
-        <div className="bg-gray-50 rounded-lg p-4 mb-4 h-64 overflow-y-auto">
-          {conversationHistory.length === 0 ? (
-            <p className="text-center text-gray-500">会話を始めましょう</p>
-          ) : (
-            conversationHistory.map((item, index) => (
-              <div 
-                key={index} 
-                className={`mb-3 p-2 rounded-lg ${
-                  item.role === 'staff' 
-                    ? 'bg-blue-50 border border-blue-200 ml-auto mr-2' 
-                    : 'bg-green-50 border border-green-200 mr-auto ml-2'
-                } ${
-                  item.isUser ? 'border-blue-400' : ''
-                } max-w-[80%] inline-block`}
-              >
-                <div className="flex items-center mb-1">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${
-                    item.role === 'staff' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
-                  }`}>
-                    {item.role === 'staff' ? 'S' : 'C'}
-                  </div>
-                  <span className="text-xs font-medium">
-                    {item.role === 'staff' ? '店員' : 'お客様'}
-                    {item.isUser && ' (あなた)'}
-                  </span>
-                </div>
-                <p className="text-sm ml-7 text-gray-800">{item.text}</p>
+        {/* 会話履歴エリア（画像のようなスタイル） */}
+        <div className="mb-4 sm:mb-6 max-h-[50vh] overflow-y-auto pb-2">
+          {conversationHistory.map((item, index) => (
+            <div key={index} className="mb-4 sm:mb-6">
+              <h2 className="text-base sm:text-lg font-bold mb-1 sm:mb-2 text-gray-800">
+                {item.role === 'staff' ? 'あなたのセリフ:' : 'お客さんの返答:'}
+              </h2>
+              <div className={`p-3 sm:p-4 rounded-lg ${
+                item.role === 'staff' 
+                  ? 'bg-yellow-50 border border-yellow-100' 
+                  : 'bg-blue-50 border border-blue-100'
+              }`}>
+                <p className="text-lg sm:text-xl font-medium mb-1 sm:mb-2 text-gray-800 break-words">{item.text}</p>
+                <p className="text-sm sm:text-base text-gray-700">{item.translation}</p>
               </div>
-            ))
-          )}
+            </div>
+          ))}
           <div ref={conversationEndRef} />
         </div>
 
-        {/* 現在のライン（スタッフの場合のみ表示） */}
-        {currentLine && currentLine.role === 'staff' && !waitingForCustomerResponse && (
-          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-4">
-            <div className="flex items-center mb-2">
-              <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center mr-2">
-                S
-              </div>
-              <span className="font-medium">あなたのセリフ:</span>
-              {currentLine.isKeyPhrase && (
-                <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">
-                  重要フレーズ
-                </span>
-              )}
+        {/* 現在のターン - スタッフ（ユーザー）の場合 */}
+        {currentLine && currentLine.role === 'staff' && (
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-bold mb-1 sm:mb-2 text-gray-800">あなたのセリフ:</h2>
+            <div className="bg-yellow-50 border border-yellow-100 p-3 sm:p-4 rounded-lg mb-3 sm:mb-4">
+              <p className="text-lg sm:text-xl font-medium mb-1 sm:mb-2 text-gray-800 break-words">{currentLine.text}</p>
+              <p className="text-sm sm:text-base text-gray-700">{currentLine.translation}</p>
             </div>
-            <p className={`text-lg mb-1 text-gray-800 ${currentLine.isKeyPhrase ? 'font-bold text-purple-800' : ''}`}>
-              {currentLine.text}
-            </p>
-            <p className="text-sm text-gray-600 mb-3">{currentLine.translation}</p>
-            
-            <div className="flex gap-2">
+
+            <div className="flex flex-wrap justify-center gap-2 sm:space-x-4">
               <button
                 onClick={() => playPhrase(currentLine.text)}
-                className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm flex items-center"
-                disabled={isExamplePlaying}
+                className="flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm sm:text-base"
               >
-                {isExamplePlaying ? (
-                  <svg className="animate-spin mr-1" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
-                  </svg>
-                )}
-                {isExamplePlaying ? '再生中...' : '聞く'}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1 sm:mr-2" viewBox="0 0 16 16">
+                  <path d="M11.536 14.01A8.473 8.473 0 0 0 14.026 8a8.473 8.473 0 0 0-2.49-6.01l-.708.707A7.476 7.476 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303l.708.707z"/>
+                  <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.483 5.483 0 0 1 11.025 8a5.483 5.483 0 0 1-1.61 3.89l.706.706z"/>
+                  <path d="M8.707 11.182A4.486 4.486 0 0 0 10.025 8a4.486 4.486 0 0 0-1.318-3.182L8 5.525A3.489 3.489 0 0 1 9.025 8 3.49 3.49 0 0 1 8 10.475l.707.707zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06z"/>
+                </svg>
+                聞く
               </button>
               
               <AudioRecorder 
@@ -365,74 +295,61 @@ export default function InteractiveDialoguePractice({ onComplete }: InteractiveD
               />
               
               <button
-                onClick={() => {
-                  setConversationHistory(prev => [
-                    ...prev, 
-                    { role: 'staff', text: currentLine.text, isUser: true }
-                  ]);
-                  advanceConversation();
-                }}
-                className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm"
+                onClick={skipToNext}
+                className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm sm:text-base"
               >
-                スキップ
+                もう一度
               </button>
             </div>
-          </div>
-        )}
-        
-        {/* お客様の返答待ち表示 */}
-        {waitingForCustomerResponse && !customerAudioPlayed && (
-          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
-            <div className="flex items-center mb-2">
-              <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center mr-2">
-                C
+            
+            {/* フィードバックメッセージ */}
+            {showFeedback && (
+              <div className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-lg text-center ${
+                feedbackMessage.includes('素晴らしい') 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-orange-100 text-orange-800'
+              }`}>
+                <p className="font-medium text-sm sm:text-base">{feedbackMessage}</p>
+                {!feedbackMessage.includes('素晴らしい') && (
+                  <p className="text-xs sm:text-sm mt-1">「{currentLine.text}」と発音してください</p>
+                )}
               </div>
-              <span className="font-medium">お客様の返答:</span>
-            </div>
-            <div className="flex items-center justify-center p-2">
-              <div className="animate-pulse flex space-x-1">
-                <div className="h-3 w-3 bg-green-400 rounded-full"></div>
-                <div className="h-3 w-3 bg-green-400 rounded-full"></div>
-                <div className="h-3 w-3 bg-green-400 rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* フィードバックメッセージ */}
-        {showFeedback && (
-          <div className={`mb-4 p-3 rounded-lg text-center ${
-            feedbackMessage.includes('素晴らしい') 
-              ? 'bg-green-100 border border-green-300 text-green-800' 
-              : feedbackMessage.includes('良い') 
-                ? 'bg-blue-100 border border-blue-300 text-blue-800' 
-                : 'bg-orange-100 border border-orange-300 text-orange-800'
-          }`}>
-            <div className="flex items-center justify-center">
-              {feedbackMessage.includes('素晴らしい') ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="mr-2" viewBox="0 0 16 16">
-                  <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                </svg>
-              ) : feedbackMessage.includes('もう一度') ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="mr-2" viewBox="0 0 16 16">
-                  <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
-                  <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="mr-2" viewBox="0 0 16 16">
-                  <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
-                </svg>
-              )}
-              <p className="font-medium">{feedbackMessage}</p>
-            </div>
-            {!feedbackMessage.includes('素晴らしい') && (
-              <p className="text-sm mt-2">
-                「{currentLine?.text}」と発音してください
-              </p>
             )}
           </div>
         )}
-        
+
+        {/* 現在のターン - お客さんの場合（自動再生） */}
+        {currentLine && currentLine.role === 'customer' && (
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-base sm:text-lg font-bold mb-1 sm:mb-2 text-gray-800">お客さんの返答:</h2>
+            <div className="bg-blue-50 border border-blue-100 p-3 sm:p-4 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-blue-600 font-medium text-sm sm:text-base">お客さんの返答を聞いています...</p>
+                <div className="mt-2 flex justify-center">
+                  <div className="animate-pulse flex space-x-1">
+                    <div className="h-2 w-2 sm:h-3 sm:w-3 bg-blue-400 rounded-full"></div>
+                    <div className="h-2 w-2 sm:h-3 sm:w-3 bg-blue-400 rounded-full animation-delay-200"></div>
+                    <div className="h-2 w-2 sm:h-3 sm:w-3 bg-blue-400 rounded-full animation-delay-400"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 会話完了メッセージ */}
+        {currentTurn > dialogue.length && (
+          <div className="text-center">
+            <p className="text-green-600 font-medium mb-3 sm:mb-4 text-sm sm:text-base">会話練習が完了しました！</p>
+            <button
+              onClick={onComplete}
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm sm:text-base"
+            >
+              次へ
+            </button>
+          </div>
+        )}
+
         {/* 音声プレーヤー */}
         <div className={isAudioPlaying ? "" : "hidden"}>
           <AudioPlayer 
@@ -445,21 +362,8 @@ export default function InteractiveDialoguePractice({ onComplete }: InteractiveD
         </div>
       </div>
       
-      <div className="flex justify-between items-center">
-        <div className="text-sm text-gray-500">
-          {completedScenes.size} / {dialogueScenes.length} シーン完了
-        </div>
-        <button
-          onClick={onComplete}
-          disabled={!allScenesCompleted}
-          className={`px-6 py-2 rounded-lg transition-colors ${
-            allScenesCompleted
-              ? 'bg-blue-500 hover:bg-blue-600 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          次のセクションへ
-        </button>
+      <div className="text-center mt-3 text-xs sm:text-sm text-gray-500">
+        © 2025 SOZOの教室
       </div>
     </div>
   );

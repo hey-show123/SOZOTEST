@@ -2,6 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 
+export type Phrase = {
+  text: string;
+  translation: string;
+};
+
+export type DialogueTurn = {
+  role: 'staff' | 'customer';
+  text: string;
+  translation: string;
+  turnNumber: number;
+};
+
 export type Lesson = {
   id: string;
   title: string;
@@ -12,6 +24,42 @@ export type Lesson = {
   tags: string[];
   createdAt: number;
   updatedAt: number;
+  keyPhrase?: Phrase;
+  dialogueTurns?: DialogueTurn[];
+};
+
+// デフォルトのダイアログ
+const DEFAULT_DIALOGUE: DialogueTurn[] = [
+  {
+    role: 'staff',
+    text: "What would you like to do today?",
+    translation: "今日はどうされますか？",
+    turnNumber: 1
+  },
+  {
+    role: 'customer',
+    text: "A haircut please, my hair feels damaged.",
+    translation: "カットをお願いします。髪が傷んでいるように感じます。",
+    turnNumber: 2
+  },
+  {
+    role: 'staff',
+    text: "Would you like to do a treatment as well?",
+    translation: "トリートメントもされたいですか？",
+    turnNumber: 3
+  },
+  {
+    role: 'customer',
+    text: "Sure.",
+    translation: "はい",
+    turnNumber: 4
+  }
+];
+
+// デフォルトのキーフレーズ
+const DEFAULT_KEY_PHRASE: Phrase = {
+  text: "Would you like to do a treatment as well?",
+  translation: "トリートメントもされたいですか？"
 };
 
 // 初期レッスンデータ
@@ -26,6 +74,8 @@ const DEFAULT_LESSONS: Lesson[] = [
     tags: ['医療', '英語', '問診'],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    keyPhrase: DEFAULT_KEY_PHRASE,
+    dialogueTurns: DEFAULT_DIALOGUE
   }
 ];
 
@@ -48,7 +98,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     pdfUrl: '',
     systemPrompt: '',
     level: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
-    tags: ''
+    tags: '',
+    keyPhraseText: '',
+    keyPhraseTranslation: '',
+    dialogueText: ''
   });
 
   // コンポーネントマウント時にローカルストレージからレッスンを読み込む
@@ -97,7 +150,12 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       pdfUrl: '',
       systemPrompt: '',
       level: 'beginner',
-      tags: ''
+      tags: '',
+      keyPhraseText: DEFAULT_KEY_PHRASE.text,
+      keyPhraseTranslation: DEFAULT_KEY_PHRASE.translation,
+      dialogueText: DEFAULT_DIALOGUE.map(turn => 
+        `${turn.role}: "${turn.text}" - "${turn.translation}"`
+      ).join('\n')
     });
     setIsAdding(true);
     setIsEditing(false);
@@ -105,6 +163,15 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
 
   // 編集モード開始
   const handleStartEdit = (lesson: Lesson) => {
+    // ダイアログテキストの変換
+    const dialogueText = lesson.dialogueTurns 
+      ? lesson.dialogueTurns.map(turn => 
+          `${turn.role}: "${turn.text}" - "${turn.translation}"`
+        ).join('\n')
+      : DEFAULT_DIALOGUE.map(turn => 
+          `${turn.role}: "${turn.text}" - "${turn.translation}"`
+        ).join('\n');
+
     setFormData({
       id: lesson.id,
       title: lesson.title,
@@ -112,7 +179,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       pdfUrl: lesson.pdfUrl || '',
       systemPrompt: lesson.systemPrompt || '',
       level: lesson.level,
-      tags: lesson.tags.join(', ')
+      tags: lesson.tags.join(', '),
+      keyPhraseText: lesson.keyPhrase?.text || DEFAULT_KEY_PHRASE.text,
+      keyPhraseTranslation: lesson.keyPhrase?.translation || DEFAULT_KEY_PHRASE.translation,
+      dialogueText
     });
     setIsEditing(true);
     setIsAdding(false);
@@ -162,6 +232,48 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       return;
     }
 
+    // ダイアログデータの解析
+    let dialogueTurns: DialogueTurn[] = [];
+    try {
+      // 各行を解析
+      const lines = formData.dialogueText.split('\n').filter(line => line.trim());
+      dialogueTurns = lines.map((line, index) => {
+        // パターン: role: "text" - "translation"
+        const roleMatch = line.match(/^(staff|customer):/i);
+        if (!roleMatch) throw new Error(`行 ${index + 1} の役割が無効です。'staff:' または 'customer:' で始める必要があります`);
+        
+        const role = roleMatch[1].toLowerCase() as 'staff' | 'customer';
+        
+        // テキストと翻訳を抽出
+        const textMatch = line.match(/"([^"]+)"\s*-\s*"([^"]+)"/);
+        if (!textMatch) throw new Error(`行 ${index + 1} のフォーマットが無効です。"テキスト" - "翻訳" の形式が必要です`);
+        
+        const text = textMatch[1];
+        const translation = textMatch[2];
+        
+        return {
+          role,
+          text,
+          translation,
+          turnNumber: index + 1
+        };
+      });
+    } catch (error) {
+      alert(`ダイアログの解析エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
+      return;
+    }
+
+    // キーフレーズの検証
+    if (!formData.keyPhraseText.trim() || !formData.keyPhraseTranslation.trim()) {
+      alert('キーフレーズとその翻訳は必須です');
+      return;
+    }
+
+    const keyPhrase: Phrase = {
+      text: formData.keyPhraseText,
+      translation: formData.keyPhraseTranslation
+    };
+
     const tagsArray = formData.tags
       .split(',')
       .map(tag => tag.trim())
@@ -176,7 +288,9 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       level: formData.level,
       tags: tagsArray,
       createdAt: isAdding ? Date.now() : (currentLesson?.createdAt || Date.now()),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      keyPhrase,
+      dialogueTurns
     };
 
     let updatedLessons: Lesson[];
@@ -321,6 +435,57 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
               />
             </div>
             
+            {/* キーフレーズ設定 */}
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-lg font-medium mb-3">キーフレーズ設定</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">キーフレーズ（英語）</label>
+                <input
+                  type="text"
+                  name="keyPhraseText"
+                  value={formData.keyPhraseText}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                  placeholder="例: Would you like to do a treatment as well?"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">キーフレーズ（日本語訳）</label>
+                <input
+                  type="text"
+                  name="keyPhraseTranslation"
+                  value={formData.keyPhraseTranslation}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
+                  placeholder="例: トリートメントもされたいですか？"
+                />
+              </div>
+            </div>
+            
+            {/* ダイアログ設定 */}
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-lg font-medium mb-3">ダイアログ設定</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                各行は <code className="bg-gray-100 px-1">role: "テキスト" - "翻訳"</code> の形式で入力してください。<br />
+                roleは「staff」または「customer」のいずれかです。
+              </p>
+              <div className="mb-4">
+                <textarea
+                  name="dialogueText"
+                  value={formData.dialogueText}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black font-mono text-sm"
+                  rows={10}
+                  placeholder='staff: "What would you like to do today?" - "今日はどうされますか？"
+customer: "A haircut please, my hair feels damaged." - "カットをお願いします。髪が傷んでいるように感じます。"
+staff: "Would you like to do a treatment as well?" - "トリートメントもされたいですか？"
+customer: "Sure." - "はい"'
+                />
+              </div>
+            </div>
+            
             <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="button"
@@ -368,6 +533,31 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                     >
                       <h3 className="font-medium text-black">{lesson.title}</h3>
                       <p className="text-sm text-gray-600 mt-1">{lesson.description}</p>
+                      
+                      {/* レッスンの直接URL */}
+                      <div className="mt-2 mb-2 flex items-center">
+                        <span className="text-xs text-gray-500 mr-1">URL:</span>
+                        <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-blue-600 truncate max-w-[200px] inline-block">
+                          {typeof window !== 'undefined' ? `${window.location.origin}/lesson/${lesson.id}` : `/lesson/${lesson.id}`}
+                        </code>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // 親要素のクリックイベントを防止
+                            if (typeof window !== 'undefined') {
+                              navigator.clipboard.writeText(`${window.location.origin}/lesson/${lesson.id}`);
+                              alert('URLをコピーしました！');
+                            }
+                          }}
+                          className="ml-1 text-xs text-blue-500 hover:text-blue-700"
+                          title="URLをコピー"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                            <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                          </svg>
+                        </button>
+                      </div>
+                      
                       <div className="flex items-center mt-2">
                         <span className={`px-2 py-0.5 text-xs rounded ${
                           lesson.level === 'beginner' ? 'bg-green-100 text-green-800' :

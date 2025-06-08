@@ -4,18 +4,23 @@ import { useState, useEffect } from 'react';
 import AudioPlayer from '../AudioPlayer';
 import AudioRecorder from '../AudioRecorder';
 import Image from 'next/image';
+import { Phrase } from './LessonManager';
 
 interface SimplePhrasePracticeProps {
   onComplete: () => void;
   avatarImage?: string; // アバター画像のパスを受け取るプロパティを追加
+  keyPhrase?: Phrase; // キーフレーズを受け取るプロパティを追加
 }
 
-export default function SimplePhrasePractice({ onComplete, avatarImage }: SimplePhrasePracticeProps) {
-  // キーフレーズの情報
-  const keyPhrase = {
+export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhrase }: SimplePhrasePracticeProps) {
+  // デフォルトのキーフレーズ（keyPhraseが指定されていない場合に使用）
+  const defaultKeyPhrase = {
     text: "Would you like to do a treatment as well?",
     translation: "トリートメントもされたいですか？",
   };
+
+  // 使用するキーフレーズ（propsから受け取るか、デフォルト値を使用）
+  const phraseToUse = keyPhrase || defaultKeyPhrase;
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
@@ -24,23 +29,26 @@ export default function SimplePhrasePractice({ onComplete, avatarImage }: Simple
   const [successCount, setSuccessCount] = useState(0); // 正しい発音に成功した回数
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [showContinueButton, setShowContinueButton] = useState(false);
-  const [audioText, setAudioText] = useState(keyPhrase.text); // 再生する音声テキスト
+  const [audioText, setAudioText] = useState(phraseToUse.text); // 初期値をキーフレーズに設定
+  const [initialPlayDone, setInitialPlayDone] = useState(false);
 
-  // コンポーネントがマウントされたらキーフレーズを自動的に再生
+  // コンポーネントがマウントされたら自動的にキーフレーズを再生する
   useEffect(() => {
+    // すでに再生済みの場合は実行しない
+    if (initialPlayDone) return;
+    
     // 少し遅延させて再生（画面表示後に再生するため）
     const timer = setTimeout(() => {
-      // 直接フレーズだけを再生するように設定
-      setAudioText(keyPhrase.text);
       setIsAudioPlaying(true);
-    }, 1000);
+    }, 500);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [initialPlayDone]);
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
+    setInitialPlayDone(true); // 初回再生完了をマーク
   };
 
   // 音声認識結果の処理
@@ -54,7 +62,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage }: Simple
       
       // 正規化（小文字化、句読点除去、空白除去）
       const normalizedUserAnswer = text.toLowerCase().replace(/[.,?!]/g, '').trim();
-      const normalizedKeyPhrase = keyPhrase.text.toLowerCase().replace(/[.,?!]/g, '').trim();
+      const normalizedKeyPhrase = phraseToUse.text.toLowerCase().replace(/[.,?!]/g, '').trim();
       
       // 完全一致のみを正解とする
       if (normalizedUserAnswer === normalizedKeyPhrase) {
@@ -80,7 +88,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage }: Simple
 
   // キーフレーズを再生
   const playKeyPhrase = () => {
-    setAudioText(keyPhrase.text); // 直接フレーズのみを設定
+    setAudioText(phraseToUse.text); // 直接フレーズのみを設定
     setIsAudioPlaying(true);
   };
 
@@ -92,8 +100,8 @@ export default function SimplePhrasePractice({ onComplete, avatarImage }: Simple
           {/* 吹き出しの黄色い背景 */}
           <div className="bg-yellow-100 border-2 border-yellow-300 rounded-3xl p-6 mb-2 relative">
             {/* フレーズと訳文 */}
-            <p className="text-center text-2xl font-bold text-gray-800 mb-4">{keyPhrase.text}</p>
-            <p className="text-center text-lg text-gray-700">{keyPhrase.translation}</p>
+            <p className="text-center text-2xl font-bold text-gray-800 mb-4">{phraseToUse.text}</p>
+            <p className="text-center text-lg text-gray-700">{phraseToUse.translation}</p>
             
             {/* フレーズ再生ボタン（右上に配置） */}
             <button

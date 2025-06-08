@@ -62,19 +62,35 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
     setScale(prevScale => Math.max(prevScale - 0.1, 0.5));
   }
 
+  // 特定のページに移動
+  function goToPage(page: number) {
+    if (numPages && page >= 1 && page <= numPages) {
+      setPageNumber(page);
+    }
+  }
+
   return (
     <div className={`pdf-viewer w-full h-full flex flex-col ${className}`}>
       {/* PDF表示部分 */}
-      <div className="flex-1 overflow-auto bg-gray-100 relative">
+      <div className="flex-1 overflow-auto bg-gray-50 dark:bg-slate-900 relative">
         {isLoading && (
-          <div className="absolute inset-0 flex justify-center items-center bg-white bg-opacity-80">
-            <div className="loader">PDFを読み込み中...</div>
+          <div className="absolute inset-0 flex justify-center items-center bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 border-4 border-t-blue-500 border-blue-200 rounded-full animate-spin"></div>
+              <p className="mt-3 text-sm font-medium text-gray-600 dark:text-gray-300">PDFを読み込み中...</p>
+            </div>
           </div>
         )}
         
         {error && (
-          <div className="absolute inset-0 flex justify-center items-center bg-white bg-opacity-80">
-            <div className="text-red-500">{error}</div>
+          <div className="absolute inset-0 flex justify-center items-center bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm">
+            <div className="text-red-500 p-6 bg-red-50 dark:bg-red-900/30 rounded-lg border border-red-100 dark:border-red-800 shadow-lg max-w-md">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 text-center mb-2">エラーが発生しました</h3>
+              <p className="text-center">{error}</p>
+            </div>
           </div>
         )}
         
@@ -82,67 +98,103 @@ export default function PDFViewer({ pdfUrl, className = '' }: PDFViewerProps) {
           file={pdfUrl}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
-          className="flex justify-center"
+          className="flex justify-center py-6"
         >
           <Page 
             pageNumber={pageNumber} 
             scale={scale}
             renderTextLayer={true}
             renderAnnotationLayer={true}
-            className="shadow-lg"
+            className="shadow-xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 transition-all duration-300"
           />
         </Document>
       </div>
       
       {/* コントロールパネル */}
-      <div className="flex items-center justify-between p-2 bg-gray-200 border-t border-gray-300">
-        <div className="flex space-x-2">
+      <div className="bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 glass-effect">
+        {/* ページナビゲーション */}
+        <div className="flex items-center justify-between p-2">
+          <div className="flex space-x-2">
+            <button
+              onClick={zoomOut}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
+              disabled={scale <= 0.5}
+              title="縮小"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+              </svg>
+            </button>
+            <button
+              onClick={zoomIn}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
+              disabled={scale >= 2.0}
+              title="拡大"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* ページ選択 */}
+          {numPages && numPages > 1 && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={goToPrevPage}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
+                disabled={pageNumber <= 1}
+                title="前のページ"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              <div className="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20 text-sm font-medium flex items-center space-x-1">
+                <span className="text-gray-800 dark:text-gray-200">
+                  {pageNumber} / {numPages}
+                </span>
+              </div>
+              
+              <button
+                onClick={goToNextPage}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
+                disabled={numPages !== null && pageNumber >= numPages}
+                title="次のページ"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+          
+          {/* 全画面表示ボタン */}
           <button
-            onClick={zoomOut}
-            className="p-1 bg-white rounded border border-gray-300 hover:bg-gray-100"
-            disabled={scale <= 0.5}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
+            title="全画面表示"
+            onClick={() => document.documentElement.requestFullscreen().catch(e => console.error('全画面エラー:', e))}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path fillRule="evenodd" d="M6.5 12a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM13 6.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z"/>
-              <path d="M10.5 8H2.5a.5.5 0 0 1 0-1h8a.5.5 0 0 1 0 1z"/>
-            </svg>
-          </button>
-          <button
-            onClick={zoomIn}
-            className="p-1 bg-white rounded border border-gray-300 hover:bg-gray-100"
-            disabled={scale >= 2.0}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path fillRule="evenodd" d="M6.5 12a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM13 6.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z"/>
-              <path d="M10.5 3.5a.5.5 0 0 0-.5.5v2.5H7.5a.5.5 0 0 0 0 1h2.5V10a.5.5 0 0 0 1 0V7.5H13a.5.5 0 0 0 0-1h-2.5V4a.5.5 0 0 0-.5-.5z"/>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
             </svg>
           </button>
         </div>
         
-        <div className="text-xs">
-          {numPages ? `${pageNumber} / ${numPages}` : '読み込み中...'}
-        </div>
-        
-        <div className="flex space-x-2">
-          <button
-            onClick={goToPrevPage}
-            className="p-1 bg-white rounded border border-gray-300 hover:bg-gray-100"
-            disabled={pageNumber <= 1}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
-            </svg>
-          </button>
-          <button
-            onClick={goToNextPage}
-            className="p-1 bg-white rounded border border-gray-300 hover:bg-gray-100"
-            disabled={numPages !== null && pageNumber >= numPages}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
-            </svg>
-          </button>
-        </div>
+        {/* スライダー */}
+        {numPages && numPages > 3 && (
+          <div className="px-4 pb-3 pt-1">
+            <input
+              type="range"
+              min={1}
+              max={numPages}
+              value={pageNumber}
+              onChange={(e) => goToPage(parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
