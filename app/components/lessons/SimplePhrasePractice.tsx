@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AudioPlayer from '../AudioPlayer';
 import AudioRecorder from '../AudioRecorder';
 import Image from 'next/image';
@@ -33,6 +33,24 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   const [initialPlayDone, setInitialPlayDone] = useState(false);
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
   const [avatarFeedback, setAvatarFeedback] = useState(''); // アバターのフィードバックメッセージ
+  const [currentAvatarIndex, setCurrentAvatarIndex] = useState(0); // 現在表示中のアバター画像インデックス
+
+  // アバター画像の配列
+  const avatarImages = [
+    '/images/avatar/Gemini_Generated_Image_no9r19no9r19no9r.png',
+    '/images/avatar/Gemini_Generated_Image_wbi9nhwbi9nhwbi9.png'
+  ];
+
+  // アバター画像を切り替えるための効果
+  useEffect(() => {
+    if (isAvatarSpeaking) {
+      const interval = setInterval(() => {
+        setCurrentAvatarIndex(prev => (prev === 0 ? 1 : 0));
+      }, 750); // 0.75秒ごとに切り替え
+      
+      return () => clearInterval(interval);
+    }
+  }, [isAvatarSpeaking]);
 
   // コンポーネントがマウントされたら自動的にキーフレーズを再生する
   useEffect(() => {
@@ -105,8 +123,18 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-4 flex flex-col items-center justify-center">
-      <div className="w-full bg-white rounded-3xl shadow-lg p-6 relative">
+    <div className="w-full max-w-md mx-auto p-4 flex flex-col items-center justify-center relative">
+      {/* 背景画像 */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden rounded-xl z-0">
+        <Image
+          src="/images/background/Gemini_Generated_Image_jp0msxjp0msxjp0m.png"
+          alt="Salon Background"
+          fill
+          className="object-cover opacity-30"
+        />
+      </div>
+      
+      <div className="w-full bg-white/95 backdrop-blur-sm rounded-3xl shadow-lg p-6 relative z-10">
         {/* キーフレーズの吹き出し */}
         <div className="relative mb-10">
           {/* 吹き出しの黄色い背景 */}
@@ -135,29 +163,14 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         
         {/* アバターとアシスタント名 */}
         <div className="flex items-center mb-6">
-          <div className={`relative w-16 h-16 bg-blue-100 rounded-full overflow-hidden mr-4 flex-shrink-0 ${isAvatarSpeaking ? 'animate-pulse border-2 border-blue-400' : ''}`}>
-            {avatarImage ? (
-              // カスタムアバター画像が指定されている場合
-              <Image 
-                src={avatarImage} 
-                alt="SOZO Assistant" 
-                fill 
-                className="object-cover"
-              />
-            ) : (
-              // デフォルトのシンプルなアバターアイコン
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="8" r="5" />
-                  <path d="M20 21v-2a7 7 0 0 0-14 0v2" />
-                  {/* ヘッドフォンの簡易表現 */}
-                  <path d="M2 12h2v4h-2z" fill="currentColor" />
-                  <path d="M20 12h2v4h-2z" fill="currentColor" />
-                  <path d="M2 12c0-3 2-4 4-4" strokeLinecap="round" />
-                  <path d="M22 12c0-3-2-4-4-4" strokeLinecap="round" />
-                </svg>
-              </div>
-            )}
+          <div className={`relative w-24 h-24 bg-blue-100 rounded-full overflow-hidden mr-4 flex-shrink-0 ${isAvatarSpeaking ? 'animate-pulse border-2 border-blue-400' : ''}`}>
+            {/* アニメーションするアバター画像 */}
+            <Image 
+              src={avatarImages[currentAvatarIndex]}
+              alt="SOZO Assistant"
+              fill
+              className="object-cover"
+            />
             
             {/* 話している状態を示すインジケーター */}
             {isAvatarSpeaking && (

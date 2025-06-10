@@ -72,6 +72,24 @@ export default function InteractiveDialoguePractice({
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [conversationHistory, setConversationHistory] = useState<ConversationItem[]>([]);
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
+  const [currentAvatarIndex, setCurrentAvatarIndex] = useState(0); // 現在表示中のアバター画像インデックス
+  
+  // アバター画像の配列
+  const avatarImages = [
+    '/images/avatar/Gemini_Generated_Image_no9r19no9r19no9r.png',
+    '/images/avatar/Gemini_Generated_Image_wbi9nhwbi9nhwbi9.png'
+  ];
+
+  // アバター画像を切り替えるための効果
+  useEffect(() => {
+    if (isAvatarSpeaking) {
+      const interval = setInterval(() => {
+        setCurrentAvatarIndex(prev => (prev === 0 ? 1 : 0));
+      }, 750); // 0.75秒ごとに切り替え
+      
+      return () => clearInterval(interval);
+    }
+  }, [isAvatarSpeaking]);
   
   // 会話履歴の自動スクロール用のref
   const conversationEndRef = useRef<HTMLDivElement>(null);
@@ -241,8 +259,18 @@ export default function InteractiveDialoguePractice({
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-4 overflow-auto">
-      <div className="w-full max-w-xl bg-white rounded-lg shadow-md p-4 sm:p-6">
+    <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-4 overflow-auto relative">
+      {/* 背景画像 */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden z-0">
+        <Image
+          src="/images/background/Gemini_Generated_Image_jp0msxjp0msxjp0m.png"
+          alt="Salon Background"
+          fill
+          className="object-cover opacity-20"
+        />
+      </div>
+      
+      <div className="w-full max-w-xl bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6 relative z-10">
         {/* レッスンタイトル */}
         <div className="text-center mb-3 sm:mb-4">
           <h1 className="text-xl sm:text-3xl font-bold mb-2 sm:mb-3 text-gray-800">{lessonTitle}</h1>
@@ -256,7 +284,7 @@ export default function InteractiveDialoguePractice({
           <div className="relative">
             <div className={`relative w-32 h-32 sm:w-40 sm:h-40 bg-blue-100 rounded-full overflow-hidden border-4 ${isAvatarSpeaking ? 'border-blue-400 animate-pulse' : 'border-blue-200'}`}>
               <Image
-                src="/images/avatar/Gemini_Generated_Image_wbi9nhwbi9nhwbi9.png"
+                src={avatarImages[currentAvatarIndex]}
                 alt="Customer Avatar"
                 fill
                 className="object-cover"
