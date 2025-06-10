@@ -258,6 +258,17 @@ export default function InteractiveDialoguePractice({
     }
   };
 
+  // 「もう一度」ボタンの処理 - 現在のセリフを再練習する
+  const retryCurrentLine = () => {
+    // 録音状態をリセット
+    setIsRecording(false);
+    // フィードバックを非表示
+    setShowFeedback(false);
+    // オーディオ再生をリセット
+    setIsAudioPlaying(false);
+    setIsAvatarSpeaking(false);
+  };
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-4 overflow-auto relative">
       {/* 背景画像 */}
@@ -357,10 +368,17 @@ export default function InteractiveDialoguePractice({
               />
               
               <button
-                onClick={skipToNext}
+                onClick={retryCurrentLine}
                 className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm sm:text-base"
               >
                 もう一度
+              </button>
+
+              <button
+                onClick={skipToNext}
+                className="px-4 sm:px-6 py-2 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm sm:text-base"
+              >
+                スキップ
               </button>
             </div>
             
