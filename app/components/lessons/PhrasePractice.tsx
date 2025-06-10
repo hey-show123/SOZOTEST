@@ -158,10 +158,15 @@ export default function PhrasePractice({ onComplete }: PhrasePracticeProps) {
                   if (autoAdvance) {
                     setTimeout(handleNext, 500);
                   }
+                  // 自動進行がオフの場合でも次に進むように変更
+                  else {
+                    setTimeout(handleNext, 500);
+                  }
                 }}
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold"
               >
-                発音しました（マイクなし）
+                {/* テスト用の一時的なボタン - 後で削除予定 */}
+                次に進む
               </button>
             </div>
             
