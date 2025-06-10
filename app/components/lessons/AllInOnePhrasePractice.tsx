@@ -162,9 +162,9 @@ export default function AllInOnePhrasePractice({ onComplete }: AllInOnePhrasePra
                     onClick={() => {
                       handleTranscription(practice.id, practice.phrase);
                     }}
-                    className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
                   >
-                    スキップ
+                    次に進む
                   </button>
                 </div>
               </div>
