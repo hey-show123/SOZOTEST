@@ -168,6 +168,22 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
           </div>
         </div>
         
+        {/* テスト用：次に進むボタン */}
+        <div className="flex justify-center mb-6">
+          <button
+            onClick={() => {
+              // 発音成功とみなして次に進む
+              const newSuccessCount = 2; // 2回成功したことにする
+              setSuccessCount(newSuccessCount);
+              setShowContinueButton(true);
+              setFeedbackMessage('素晴らしい発音です！次のセクションに進みましょう。');
+            }}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+          >
+            次に進む
+          </button>
+        </div>
+        
         {/* フィードバックメッセージ */}
         {userAnswer && (
           <div className={`rounded-lg p-4 mb-6 text-center ${
