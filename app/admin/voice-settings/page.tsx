@@ -7,6 +7,7 @@ import Link from 'next/link';
 import VoiceSelector from '../../components/VoiceSelector';
 import { VoiceProvider } from '../../context/VoiceContext';
 import ModelSelector from '../../components/ModelSelector';
+import { ModelProvider } from '../../context/ModelContext';
 
 // 音声読み上げスピード設定コンポーネント
 function SpeechRateSelector() {
@@ -14,17 +15,25 @@ function SpeechRateSelector() {
   
   // コンポーネントがマウントされた時に、ローカルストレージから値を読み込む
   useEffect(() => {
-    const savedRate = localStorage.getItem('speechRate');
-    if (savedRate) {
-      setSpeechRate(savedRate);
+    try {
+      const savedRate = localStorage.getItem('speechRate');
+      if (savedRate) {
+        setSpeechRate(savedRate);
+      }
+    } catch (error) {
+      console.error('LocalStorage読み込みエラー:', error);
     }
   }, []);
   
   // 値が変更された時に、ローカルストレージに保存する
   const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newRate = e.target.value;
-    setSpeechRate(newRate);
-    localStorage.setItem('speechRate', newRate);
+    try {
+      const newRate = e.target.value;
+      setSpeechRate(newRate);
+      localStorage.setItem('speechRate', newRate);
+    } catch (error) {
+      console.error('LocalStorage保存エラー:', error);
+    }
   };
   
   return (
@@ -102,24 +111,26 @@ export default function VoiceSettingsPage() {
           </div>
           
           <div className="p-6">
-            <VoiceProvider>
-              {/* 音声選択 */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-900 mb-3">音声の種類</h3>
-                <VoiceSelector />
-              </div>
-            </VoiceProvider>
-            
-            {/* 読み上げ速度設定 */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <SpeechRateSelector />
-            </div>
-            
-            {/* AIモデル設定 */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">AIモデル設定</h3>
-              <ModelSelector />
-            </div>
+            <ModelProvider>
+              <VoiceProvider>
+                {/* 音声選択 */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">音声の種類</h3>
+                  <VoiceSelector />
+                </div>
+                
+                {/* 読み上げ速度設定 */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <SpeechRateSelector />
+                </div>
+                
+                {/* AIモデル設定 */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">AIモデル設定</h3>
+                  <ModelSelector />
+                </div>
+              </VoiceProvider>
+            </ModelProvider>
             
             <div className="mt-8 flex justify-end">
               <Link

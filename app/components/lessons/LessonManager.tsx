@@ -164,6 +164,118 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     onSelectLesson(lesson);
   };
 
+  // PDFファイルのドラッグアンドドロップ処理
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error' | 'warning'>('idle');
+  const [uploadMessage, setUploadMessage] = useState('');
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    // ファイルを取得
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await handleFileUpload(files[0]);
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      await handleFileUpload(files[0]);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    // PDFファイル以外は拒否
+    if (file.type !== 'application/pdf') {
+      setUploadStatus('error');
+      setUploadMessage('PDFファイルのみアップロードできます');
+      setTimeout(() => {
+        setUploadStatus('idle');
+        setUploadMessage('');
+      }, 3000);
+      return;
+    }
+
+    setUploadStatus('uploading');
+    setUploadMessage('アップロード中...');
+
+    try {
+      // ファイル名を作成（例：lesson-123456789.pdf）
+      const fileName = `${formData.id}.pdf`;
+      
+      // FormDataを作成
+      const formDataObj = new FormData();
+      formDataObj.append('file', file);
+      formDataObj.append('fileName', fileName);
+      
+      try {
+        // PDFアップロードAPIを呼び出す
+        const response = await fetch('/api/upload-pdf', {
+          method: 'POST',
+          body: formDataObj
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'アップロードに失敗しました');
+        }
+        
+        const data = await response.json();
+        
+        // アップロード成功時の処理
+        setFormData(prev => ({
+          ...prev,
+          pdfUrl: data.url
+        }));
+        
+        setUploadStatus('success');
+        setUploadMessage(data.message || `ファイル "${file.name}" をアップロードしました`);
+      } catch (apiError) {
+        console.error('API呼び出しエラー:', apiError);
+        
+        // API呼び出しに失敗した場合はフォールバック処理
+        // パス情報だけ更新し、実際のファイルは手動でアップロードが必要であることを通知
+        const pdfUrl = `/pdfs/${fileName}`;
+        setFormData(prev => ({
+          ...prev,
+          pdfUrl
+        }));
+        
+        setUploadStatus('warning');
+        setUploadMessage(`APIエラー: PDFパスを "${pdfUrl}" に設定しました。実際のファイルは手動でアップロードしてください。`);
+      }
+      
+      // 3秒後にメッセージをクリア
+      setTimeout(() => {
+        setUploadStatus('idle');
+        setUploadMessage('');
+      }, 5000);
+      
+    } catch (error) {
+      console.error('PDFアップロードエラー:', error);
+      setUploadStatus('error');
+      setUploadMessage(error instanceof Error ? error.message : 'アップロードに失敗しました');
+      
+      setTimeout(() => {
+        setUploadStatus('idle');
+        setUploadMessage('');
+      }, 5000);
+    }
+  };
+
   // 追加モード開始
   const handleStartAdd = () => {
     setFormData({
@@ -245,34 +357,6 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }));
-  };
-
-  // PDFファイル選択のシミュレーション（実際の環境では別途ファイルアップロード処理が必要）
-  const handleFileSelection = () => {
-    alert('このデモではPDFのアップロードはシミュレーションのみです。実際の実装ではサーバーへのアップロード処理が必要です。');
-    setFormData(prev => ({
-      ...prev,
-      pdfUrl: `/pdfs/${formData.id}.pdf`
-    }));
-  };
-
-  const handlePdfPathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let path = e.target.value;
-    
-    // パスが/で始まっていない場合は/を追加
-    if (path && !path.startsWith('/')) {
-      path = '/' + path;
-    }
-    
-    // pdfs/で始まる場合、/pdfs/に修正
-    if (path && path.startsWith('/pdfs/') === false && path.startsWith('pdfs/')) {
-      path = '/' + path;
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      pdfUrl: path
     }));
   };
 
@@ -625,37 +709,73 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
             
             <div>
               <label className="block text-sm font-medium mb-1">PDFファイル</label>
-              <div className="flex items-center">
+              <div className="flex mb-4">
                 <input
                   type="text"
                   name="pdfUrl"
                   value={formData.pdfUrl}
-                  onChange={handlePdfPathChange}
+                  onChange={handleInputChange}
                   className="flex-1 p-2 border rounded-l focus:ring-blue-500 focus:border-blue-500 text-black"
                   placeholder="/pdfs/filename.pdf"
                 />
                 <button
                   type="button"
-                  onClick={handleFileSelection}
+                  onClick={() => {
+                    if (fileInputRef.current) {
+                      fileInputRef.current.click();
+                    }
+                  }}
                   className="px-4 py-2 bg-gray-200 border border-gray-300 rounded-r hover:bg-gray-300 text-black"
                 >
-                  選択
+                  参照
                 </button>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept=".pdf"
                   className="hidden"
-                  onChange={() => {}} // 実際のアップロード処理
+                  onChange={handleFileInputChange}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                PDFはディレクトリに配置してください
-              </p>
+
+              {/* ドラッグアンドドロップ領域 */}
+              <div 
+                className={`p-6 mb-4 border-2 border-dashed rounded-lg text-center ${
+                  isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <p className="mb-2 text-sm text-gray-500">
+                  PDFファイルをここにドラッグ&ドロップするか、「参照」ボタンをクリックして選択してください
+                </p>
+                <div className="text-xs text-gray-400 mt-2">
+                  ※サーバーサイドの制限により、現在はPDFファイルは <code className="bg-gray-200 px-1 py-0.5 rounded">public/pdfs/</code> ディレクトリに手動で配置する必要があります。
+                </div>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium mb-1">システムプロンプト</label>
+              {/* アップロードステータス表示 */}
+              {uploadStatus !== 'idle' && (
+                <div className={`p-3 mb-4 rounded text-sm ${
+                  uploadStatus === 'uploading' ? 'bg-blue-100 text-blue-700' :
+                  uploadStatus === 'success' ? 'bg-green-100 text-green-700' :
+                  uploadStatus === 'warning' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {uploadMessage}
+                </div>
+              )}
+
+              <p className="text-sm text-gray-500 mb-4">
+                <strong>PDFファイルの配置について:</strong><br />
+                1. PDFファイルは <code className="bg-gray-200 px-1 py-0.5 rounded">public/pdfs/</code> ディレクトリに置いてください。<br />
+                2. ファイル名は <code className="bg-gray-200 px-1 py-0.5 rounded">{formData.id}.pdf</code> のようにレッスンIDと同じにすると管理しやすいです。<br />
+                3. パスは <code className="bg-gray-200 px-1 py-0.5 rounded">/pdfs/ファイル名.pdf</code> の形式で指定してください。
+              </p>
+
+              <label className="block mb-4">
+                <span className="text-gray-700">システムプロンプト:</span>
               <textarea
                 name="systemPrompt"
                 value={formData.systemPrompt}
@@ -664,6 +784,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                 rows={3}
                 placeholder="AIへの指示（オプション）"
               />
+              </label>
             </div>
             
             <div>
@@ -933,15 +1054,15 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                 </svg>
                 インポート
               </button>
-              <button
-                onClick={handleStartAdd}
-                className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white text-sm flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-                </svg>
-                新規追加
-              </button>
+            <button
+              onClick={handleStartAdd}
+              className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white text-sm flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+              </svg>
+              新規追加
+            </button>
               
               {/* 非表示のファイル入力フィールド */}
               <input
@@ -970,13 +1091,13 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                       <div className="mt-2 mb-2 flex items-center">
                         <span className="text-xs text-gray-500 mr-1">URL:</span>
                         <code className="text-xs bg-gray-100 px-2 py-0.5 rounded text-blue-600 truncate max-w-[200px] inline-block">
-                          {typeof window !== 'undefined' ? `${window.location.origin}/lesson/${lesson.id}` : `/lesson/${lesson.id}`}
+                          {typeof window !== 'undefined' ? `${window.location.origin}/lesson/${lesson.id}?preview=1` : `/lesson/${lesson.id}?preview=1`}
                         </code>
                         <button
                           onClick={(e) => {
                             e.stopPropagation(); // 親要素のクリックイベントを防止
                             if (typeof window !== 'undefined') {
-                              navigator.clipboard.writeText(`${window.location.origin}/lesson/${lesson.id}`);
+                              navigator.clipboard.writeText(`${window.location.origin}/lesson/${lesson.id}?preview=1`);
                               alert('URLをコピーしました！');
                             }
                           }}
@@ -987,6 +1108,23 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                             <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
                             <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
                           </svg>
+                        </button>
+                      </div>
+                      
+                      {/* LearnWorlds用iframeコード */}
+                      <div className="mb-2 flex items-center">
+                        <span className="text-xs text-gray-500 mr-1">LW用:</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation(); // 親要素のクリックイベントを防止
+                            if (typeof window !== 'undefined') {
+                              navigator.clipboard.writeText(`<iframe src="${window.location.origin}/lesson/${lesson.id}?preview=1" width="100%" height="700" frameborder="0" allowfullscreen></iframe>`);
+                              alert('LearnWorlds用iframeコードをコピーしました！');
+                            }
+                          }}
+                          className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200 transition"
+                        >
+                          iframeコードをコピー
                         </button>
                       </div>
                       
@@ -1046,4 +1184,4 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       )}
     </div>
   );
-}
+} 

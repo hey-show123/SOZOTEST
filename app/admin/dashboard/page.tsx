@@ -9,9 +9,18 @@ export default function AdminDashboard() {
   const { isAdmin, logout } = useAdmin();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [appUrl, setAppUrl] = useState('');
+  const [showIframeCode, setShowIframeCode] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    // クライアントサイドでのみ現在のURLを取得
+    if (typeof window !== 'undefined') {
+      // ホスト名とプロトコルを取得（例：https://chatgpt-app-six-psi.vercel.app）
+      const baseUrl = window.location.origin;
+      setAppUrl(baseUrl);
+    }
   }, []);
 
   // 管理者でない場合はログインページにリダイレクト
@@ -25,6 +34,24 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     logout();
     router.push('/admin');
+  };
+
+  // URLをクリップボードにコピー
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  // LearnWorlds用のiframeコードを生成
+  const generateIframeCode = () => {
+    return `<iframe src="${appUrl}?preview=1" width="100%" height="700" frameborder="0" allowfullscreen></iframe>`;
+  };
+
+  // LearnWorlds用のシンプルURLを生成
+  const generateSimpleUrl = () => {
+    return `${appUrl}?preview=1`;
   };
 
   // クライアントサイドレンダリングの前は何も表示しない
@@ -54,6 +81,73 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* LearnWorldsのURL生成セクション */}
+        <div className="bg-white shadow rounded-lg mb-8">
+          <div className="px-6 py-5 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">LearnWorlds用URL</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              このURLをLearnWorldsのコンテンツとして埋め込むことができます
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">アプリケーションURL</label>
+              <div className="flex">
+                <input
+                  type="text"
+                  readOnly
+                  value={generateSimpleUrl()}
+                  className="flex-1 p-2 border rounded-l focus:ring-blue-500 focus:border-blue-500 text-black"
+                />
+                <button
+                  onClick={() => copyToClipboard(generateSimpleUrl())}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-r hover:bg-blue-700 transition"
+                >
+                  {copied ? 'コピーしました!' : 'コピー'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">iframe埋め込みコード</label>
+                <button
+                  onClick={() => setShowIframeCode(!showIframeCode)}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  {showIframeCode ? '隠す' : '表示'}
+                </button>
+              </div>
+              
+              {showIframeCode && (
+                <div className="flex">
+                  <textarea
+                    readOnly
+                    value={generateIframeCode()}
+                    rows={3}
+                    className="flex-1 p-2 border rounded-l focus:ring-blue-500 focus:border-blue-500 text-black font-mono text-sm"
+                  />
+                  <button
+                    onClick={() => copyToClipboard(generateIframeCode())}
+                    className="px-4 bg-blue-600 text-white rounded-r hover:bg-blue-700 transition"
+                  >
+                    {copied ? 'コピーしました!' : 'コピー'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="text-sm text-gray-500">
+              <p className="mb-1">※ LearnWorldsに埋め込む場合の注意点:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>HTMLコンテンツブロックを使用して、iframeコードを貼り付けてください</li>
+                <li>ユーザーの画面サイズに合わせて、width="100%"の設定を使用することをお勧めします</li>
+                <li>height値は必要に応じて調整してください（推奨: 700px）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white shadow rounded-lg mb-8">
           <div className="px-6 py-5 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">管理機能</h2>

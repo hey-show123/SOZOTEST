@@ -378,7 +378,7 @@ export default function Chat() {
       <AudioPlayer text={currentTtsText} autoPlay={true} />
 
       {/* レッスンコンポーネントを表示 */}
-      <EnglishLesson />
+        <EnglishLesson />
     </div>
   );
 } 

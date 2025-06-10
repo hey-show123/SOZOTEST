@@ -250,18 +250,18 @@ export default function EnglishLesson() {
     <div className="w-full h-full flex flex-col">
       {isMobile && currentPdfUrl && (
         <div className="p-1 flex justify-end items-center border-b">
-          <button
-            onClick={togglePDF}
+            <button
+              onClick={togglePDF}
             className={`px-2 py-1 text-xs rounded flex items-center ${
-              showPDF ? 'bg-green-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'
-            }`}
-            title="PDF切替"
-          >
+                showPDF ? 'bg-green-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'
+              }`}
+              title="PDF切替"
+            >
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-              <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V9H3V2a1 1 0 0 1 1-1h5.5v2zM3 12v-2h2v2H3zm0 1h2v2H4a1 1 0 0 1-1-1v-1zm3 2v-2h3v2H6zm4 0v-2h3v1a1 1 0 0 1-1 1h-2zm3-3h-3v-2h3v2zm-7 0v-2h3v2H6z"/>
-            </svg>
-            {showPDF ? 'PDFを隠す' : 'PDFを表示'}
-          </button>
+                <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V9H3V2a1 1 0 0 1 1-1h5.5v2zM3 12v-2h2v2H3zm0 1h2v2H4a1 1 0 0 1-1-1v-1zm3 2v-2h3v2H6zm4 0v-2h3v1a1 1 0 0 1-1 1h-2zm3-3h-3v-2h3v2zm-7 0v-2h3v2H6z"/>
+              </svg>
+              {showPDF ? 'PDFを隠す' : 'PDFを表示'}
+            </button>
         </div>
       )}
       

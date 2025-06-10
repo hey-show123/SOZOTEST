@@ -96,9 +96,9 @@ export default function LessonIntroduction({
           <ul className="space-y-4 sm:space-y-5 overflow-y-auto max-h-[40vh] sm:max-h-none">
             {displayGoals.map((goal, index) => (
               <li key={index} className="flex items-start transform transition-all duration-300 hover:translate-x-2">
-                <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white mr-3 shadow-md">•</span>
+              <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white mr-3 shadow-md">•</span>
                 <span className="text-gray-800 dark:text-gray-200 text-sm sm:text-base">{goal.text}</span>
-              </li>
+            </li>
             ))}
           </ul>
         </div>

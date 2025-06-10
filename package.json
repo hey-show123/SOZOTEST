@@ -9,11 +9,21 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.9.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.1.1",
+    "@mui/material": "^7.1.1",
+    "@prisma/client": "^6.9.0",
+    "bcryptjs": "^3.0.2",
+    "framer-motion": "^12.16.0",
     "next": "15.3.2",
+    "next-auth": "^4.24.11",
     "openai": "^4.103.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-pdf": "^9.2.1"
+    "react-pdf": "^9.2.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -21,8 +31,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
+    "prisma": "^6.9.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

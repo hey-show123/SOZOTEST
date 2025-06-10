@@ -75,31 +75,96 @@ export default function AdminLessonsPage() {
             {currentLesson && (
               <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h3 className="text-md font-medium text-blue-900 mb-2">選択中のレッスンURL</h3>
-                <div className="flex items-center">
-                  <code className="bg-white px-3 py-2 rounded text-blue-600 flex-1 truncate overflow-auto">
-                    {typeof window !== 'undefined' ? 
-                      `${window.location.origin}/lesson/${currentLesson.id}` : 
-                      `/lesson/${currentLesson.id}`}
-                  </code>
-                  <button
-                    onClick={() => {
-                      if (typeof window !== 'undefined') {
-                        navigator.clipboard.writeText(`${window.location.origin}/lesson/${currentLesson.id}`);
-                        alert('URLをコピーしました！');
-                      }
-                    }}
-                    className="ml-2 p-2 text-blue-500 hover:text-blue-700 bg-white rounded shadow"
-                    title="URLをコピー"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
-                      <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
-                    </svg>
-                  </button>
+                
+                {/* 通常URL */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-blue-700 mb-1">直接アクセス用URL</label>
+                  <div className="flex items-center">
+                    <code className="bg-white px-3 py-2 rounded text-blue-600 flex-1 truncate overflow-auto">
+                      {typeof window !== 'undefined' ? 
+                        `${window.location.origin}/lesson/${currentLesson.id}?preview=1` : 
+                        `/lesson/${currentLesson.id}?preview=1`}
+                    </code>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          navigator.clipboard.writeText(`${window.location.origin}/lesson/${currentLesson.id}?preview=1`);
+                          alert('URLをコピーしました！');
+                        }
+                      }}
+                      className="ml-2 p-2 text-blue-500 hover:text-blue-700 bg-white rounded shadow"
+                      title="URLをコピー"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="mt-1 text-sm text-blue-600">
+                    このURLを共有することで、ユーザーは直接このレッスンにアクセスできます。
+                  </p>
                 </div>
-                <p className="mt-2 text-sm text-blue-600">
-                  このURLを共有することで、ユーザーは直接このレッスンにアクセスできます。
-                </p>
+                
+                {/* LearnWorlds用URL */}
+                <div className="mt-4">
+                  <h4 className="text-sm font-bold text-blue-900 mb-2">LearnWorlds埋め込み用</h4>
+                  
+                  {/* LearnWorldsシンプルURL */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-blue-700 mb-1">LearnWorlds用URL</label>
+                    <div className="flex items-center">
+                      <code className="bg-white px-3 py-2 rounded text-blue-600 flex-1 truncate overflow-auto">
+                        {typeof window !== 'undefined' ? 
+                          `${window.location.origin}/lesson/${currentLesson.id}?preview=1` : 
+                          `/lesson/${currentLesson.id}?preview=1`}
+                      </code>
+                      <button
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            navigator.clipboard.writeText(`${window.location.origin}/lesson/${currentLesson.id}?preview=1`);
+                            alert('LearnWorlds用URLをコピーしました！');
+                          }
+                        }}
+                        className="ml-2 p-2 text-blue-500 hover:text-blue-700 bg-white rounded shadow"
+                        title="URLをコピー"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* iframeコード */}
+                  <div>
+                    <label className="block text-sm font-medium text-blue-700 mb-1">iframe埋め込みコード</label>
+                    <div className="bg-white p-2 rounded-lg border border-blue-100">
+                      <pre className="text-xs text-blue-600 overflow-x-auto whitespace-pre-wrap">
+                        {typeof window !== 'undefined' ?
+                          `<iframe src="${window.location.origin}/lesson/${currentLesson.id}?preview=1" width="100%" height="700" frameborder="0" allowfullscreen></iframe>` :
+                          `<iframe src="/lesson/${currentLesson.id}?preview=1" width="100%" height="700" frameborder="0" allowfullscreen></iframe>`}
+                      </pre>
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          onClick={() => {
+                            if (typeof window !== 'undefined') {
+                              navigator.clipboard.writeText(`<iframe src="${window.location.origin}/lesson/${currentLesson.id}?preview=1" width="100%" height="700" frameborder="0" allowfullscreen></iframe>`);
+                              alert('iframe埋め込みコードをコピーしました！');
+                            }
+                          }}
+                          className="px-3 py-1 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded shadow"
+                        >
+                          コードをコピー
+                        </button>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-blue-600">
+                      このコードをLearnWorldsのHTMLコンテンツブロックに貼り付けることで、レッスンを埋め込めます。
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
