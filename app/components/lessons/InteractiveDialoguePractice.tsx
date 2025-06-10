@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AudioPlayer from '../AudioPlayer';
 import AudioRecorder from '../AudioRecorder';
+import Image from 'next/image';
 import { DialogueTurn } from './LessonManager';
 
 interface InteractiveDialoguePracticeProps {
@@ -70,6 +71,7 @@ export default function InteractiveDialoguePractice({
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [conversationHistory, setConversationHistory] = useState<ConversationItem[]>([]);
+  const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
   
   // 会話履歴の自動スクロール用のref
   const conversationEndRef = useRef<HTMLDivElement>(null);
@@ -103,6 +105,7 @@ export default function InteractiveDialoguePractice({
         // お客さんのセリフを自動再生
         setAudioText(currentLine.text);
         setIsAudioPlaying(true);
+        setIsAvatarSpeaking(true); // 音声再生時にアバターの会話状態をON
         
         // 会話履歴に追加
         setConversationHistory(prev => [
@@ -120,6 +123,7 @@ export default function InteractiveDialoguePractice({
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
+    setIsAvatarSpeaking(false); // 音声再生が終わったらアバターの会話状態を解除
     
     // 顧客のセリフの再生が終わったら
     if (currentLine && currentLine.role === 'customer') {
@@ -207,6 +211,7 @@ export default function InteractiveDialoguePractice({
   const playPhrase = (text: string) => {
     setAudioText(text);
     setIsAudioPlaying(true);
+    setIsAvatarSpeaking(true); // 音声再生開始時にアバターの会話状態をON
   };
 
   // スキップして次へ
@@ -246,8 +251,37 @@ export default function InteractiveDialoguePractice({
           </p>
         </div>
 
-        {/* 会話履歴エリア（画像のようなスタイル） */}
-        <div className="mb-4 sm:mb-6 max-h-[50vh] overflow-y-auto pb-2">
+        {/* アバター表示エリア */}
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <div className={`relative w-32 h-32 sm:w-40 sm:h-40 bg-blue-100 rounded-full overflow-hidden border-4 ${isAvatarSpeaking ? 'border-blue-400 animate-pulse' : 'border-blue-200'}`}>
+              <Image
+                src="/images/avatar/Gemini_Generated_Image_wbi9nhwbi9nhwbi9.png"
+                alt="Customer Avatar"
+                fill
+                className="object-cover"
+              />
+            </div>
+            
+            {/* 音声再生中の表示 */}
+            {isAvatarSpeaking && (
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
+                話し中...
+              </div>
+            )}
+            
+            {/* 会話吹き出し（最新の客のセリフ） */}
+            {currentLine && currentLine.role === 'customer' && isAvatarSpeaking && (
+              <div className="absolute -top-2 right-0 transform translate-x-full max-w-[200px] bg-blue-100 p-3 rounded-lg border border-blue-200 text-sm">
+                <p className="font-medium">{currentLine.text}</p>
+                <div className="absolute -left-2 top-4 w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-r-blue-100 border-b-[8px] border-b-transparent"></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 会話履歴エリア */}
+        <div className="mb-4 sm:mb-6 max-h-[30vh] overflow-y-auto pb-2">
           {conversationHistory.map((item, index) => (
             <div key={index} className="mb-4 sm:mb-6">
               <h2 className="text-base sm:text-lg font-bold mb-1 sm:mb-2 text-gray-800">

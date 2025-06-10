@@ -31,6 +31,8 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   const [showContinueButton, setShowContinueButton] = useState(false);
   const [audioText, setAudioText] = useState(phraseToUse.text); // 初期値をキーフレーズに設定
   const [initialPlayDone, setInitialPlayDone] = useState(false);
+  const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
+  const [avatarFeedback, setAvatarFeedback] = useState(''); // アバターのフィードバックメッセージ
 
   // コンポーネントがマウントされたら自動的にキーフレーズを再生する
   useEffect(() => {
@@ -49,6 +51,12 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
     setInitialPlayDone(true); // 初回再生完了をマーク
+    setIsAvatarSpeaking(false); // アバターの会話状態を終了
+    
+    // 初回再生後にアバターのメッセージを設定
+    if (!initialPlayDone) {
+      setAvatarFeedback('このフレーズを発音してみてね！マイクボタンを押して話してみよう。');
+    }
   };
 
   // 音声認識結果の処理
@@ -72,8 +80,10 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         // 成功回数に応じてメッセージを変更
         if (newSuccessCount === 1) {
           setFeedbackMessage('素晴らしい発音です！もう一度練習してみましょう。');
+          setAvatarFeedback('すごい！完璧な発音だよ！もう一回やってみよう！');
         } else {
           setFeedbackMessage('素晴らしい発音です！次のセクションに進みましょう。');
+          setAvatarFeedback('パーフェクト！次のセクションに進もう！');
         }
         
         // 2回成功したら次へボタンを表示
@@ -82,6 +92,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         }
       } else {
         setFeedbackMessage('もう一度挑戦してみましょう。発音が正確ではありません。');
+        setAvatarFeedback('惜しい！もう一度トライしてみよう。');
       }
     }
   };
@@ -90,6 +101,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   const playKeyPhrase = () => {
     setAudioText(phraseToUse.text); // 直接フレーズのみを設定
     setIsAudioPlaying(true);
+    setIsAvatarSpeaking(true); // アバターの会話状態をON
   };
 
   return (
@@ -123,7 +135,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         
         {/* アバターとアシスタント名 */}
         <div className="flex items-center mb-6">
-          <div className="relative w-16 h-16 bg-blue-100 rounded-full overflow-hidden mr-4 flex-shrink-0">
+          <div className={`relative w-16 h-16 bg-blue-100 rounded-full overflow-hidden mr-4 flex-shrink-0 ${isAvatarSpeaking ? 'animate-pulse border-2 border-blue-400' : ''}`}>
             {avatarImage ? (
               // カスタムアバター画像が指定されている場合
               <Image 
@@ -146,12 +158,24 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
                 </svg>
               </div>
             )}
+            
+            {/* 話している状態を示すインジケーター */}
+            {isAvatarSpeaking && (
+              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+            )}
           </div>
-          <div>
+          <div className="relative">
             <h3 className="text-xl font-bold">SOZO アシスタント</h3>
             <p className="text-lg text-gray-700">
-              もうちょっと！あと{2 - successCount}回言えたらバッチリ！発音が合ってたら、次に進めるよ〜 がんばって！
+              {avatarFeedback || `もうちょっと！あと${2 - successCount}回言えたらバッチリ！発音が合ってたら、次に進めるよ〜 がんばって！`}
             </p>
+            
+            {/* 会話風のアニメーション吹き出し */}
+            {isAvatarSpeaking && (
+              <div className="absolute -right-2 -top-6 bg-blue-100 px-2 py-1 rounded text-xs text-blue-800 animate-bounce">
+                再生中...
+              </div>
+            )}
           </div>
         </div>
         
