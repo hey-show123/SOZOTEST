@@ -151,67 +151,145 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     setCurrentLesson(null);
   };
 
+  // コンポーネントがマウントされた時にレッスンデータがない場合でも管理者ページを表示できるようにするフラグ
+  const [isLoadingLessons, setIsLoadingLessons] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // コンポーネントマウント時にレッスンを読み込む
   useEffect(() => {
     // レッスンデータを取得する
     const fetchLessons = async () => {
+      console.log('レッスンデータの取得を開始します...');
+      setIsLoadingLessons(true);
+      setLoadError(null);
+      
       try {
+        // ローカルストレージからのバックアップを先に読み込む（万が一APIがエラーになった場合のため）
+        let localBackup: Lesson[] | null = null;
+        try {
+          const savedLessons = localStorage.getItem('lessons');
+          if (savedLessons) {
+            localBackup = JSON.parse(savedLessons);
+            console.log('ローカルバックアップを読み込みました:', localBackup?.length + '件');
+          }
+        } catch (localError) {
+          console.warn('ローカルバックアップの読み込みに失敗:', localError);
+        }
+        
         // API経由でレッスンデータを取得
+        console.log('APIからレッスンデータを取得します...');
         const response = await fetch('/api/lessons');
         
         // デバッグ情報を記録
         console.log('API Response Status:', response.status);
         
-        if (response.ok) {
-          const data = await response.json();
-          console.log('API Response Data:', data);
-          
-          if (data.lessons && Array.isArray(data.lessons)) {
-            console.log(`APIから${data.lessons.length}件のレッスンデータを取得しました`);
-            
-            // データが空の場合はデフォルトレッスンを使用して保存
-            if (data.lessons.length === 0) {
-              console.log('APIからのデータが空のため、デフォルトレッスンを使用します');
-              setLessons(DEFAULT_LESSONS);
-              localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
-              
-              // APIにも保存
-              await saveLessonsToAPI(DEFAULT_LESSONS);
-              return;
-            }
-            
-            setLessons(data.lessons);
-            localStorage.setItem('lessons', JSON.stringify(data.lessons));
-            return;
-          } else {
-            console.log('APIからのレッスンデータが無効です:', data);
-          }
-        } else {
-          console.error('APIからのレッスンデータ取得に失敗しました:', response.statusText);
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
         
-        // APIから取得できない場合はローカルストレージから取得
-        const savedLessons = localStorage.getItem('lessons');
-        if (savedLessons) {
-          console.log('ローカルストレージからレッスンデータを取得しました');
-          const parsedLessons = JSON.parse(savedLessons);
-          setLessons(parsedLessons);
+        // レスポンスのJSONをパース
+        let data;
+        try {
+          data = await response.json();
+          console.log('API Response Data:', data);
+        } catch (parseError) {
+          console.error('APIレスポンスのパースに失敗:', parseError);
+          throw new Error('APIレスポンスのパースに失敗しました');
+        }
+        
+        // データの検証
+        if (!data || typeof data !== 'object') {
+          throw new Error('APIから無効な応答: データがオブジェクトではありません');
+        }
+        
+        if (!data.lessons) {
+          throw new Error('APIから無効な応答: lessonsプロパティがありません');
+        }
+        
+        if (!Array.isArray(data.lessons)) {
+          throw new Error('APIから無効な応答: lessonsが配列ではありません');
+        }
+        
+        // データの正規化（必要なプロパティの確認と補完）
+        const normalizedLessons = data.lessons.map((lesson: Partial<Lesson>) => {
+          // 必須プロパティの検証と補完
+          const normalizedLesson: Lesson = {
+            id: lesson.id || `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            title: lesson.title || '無題のレッスン',
+            description: lesson.description || '',
+            pdfUrl: lesson.pdfUrl || '',
+            systemPrompt: lesson.systemPrompt || '',
+            level: lesson.level || 'beginner',
+            tags: Array.isArray(lesson.tags) ? lesson.tags : [],
+            createdAt: typeof lesson.createdAt === 'number' ? lesson.createdAt : Date.now(),
+            updatedAt: typeof lesson.updatedAt === 'number' ? lesson.updatedAt : Date.now(),
+            headerTitle: lesson.headerTitle || '',
+            startButtonText: lesson.startButtonText || 'レッスン開始',
+            audioGenerated: !!lesson.audioGenerated
+          };
           
-          // ローカルデータをAPIにも保存を試みる
-          await saveLessonsToAPI(parsedLessons);
-        } else {
-          // 初期レッスンの保存
-          console.log('デフォルトのレッスンデータを使用します');
+          // 任意プロパティの追加
+          if (lesson.keyPhrase) {
+            normalizedLesson.keyPhrase = {
+              text: lesson.keyPhrase.text || '',
+              translation: lesson.keyPhrase.translation || ''
+            };
+          }
+          
+          if (Array.isArray(lesson.dialogueTurns)) {
+            normalizedLesson.dialogueTurns = lesson.dialogueTurns.map((turn: Partial<DialogueTurn>, index: number) => ({
+              role: turn.role === 'customer' ? 'customer' : 'staff',
+              text: turn.text || '',
+              translation: turn.translation || '',
+              turnNumber: turn.turnNumber || (index + 1),
+              audioUrl: turn.audioUrl || undefined
+            }));
+          }
+          
+          if (Array.isArray(lesson.goals)) {
+            normalizedLesson.goals = lesson.goals.map((goal: Partial<Goal>) => ({
+              text: goal.text || ''
+            }));
+          }
+          
+          return normalizedLesson;
+        });
+        
+        console.log(`APIから${normalizedLessons.length}件の正規化済みレッスンデータを取得しました`);
+        
+        // データが空の場合はデフォルトレッスンを使用
+        if (normalizedLessons.length === 0) {
+          console.log('APIからのデータが空のため、デフォルトレッスンを使用します');
           setLessons(DEFAULT_LESSONS);
           localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
           
           // APIにも保存
           await saveLessonsToAPI(DEFAULT_LESSONS);
+        } else {
+          // 正常なデータを設定
+          setLessons(normalizedLessons);
+          localStorage.setItem('lessons', JSON.stringify(normalizedLessons));
         }
       } catch (error) {
-        console.error('レッスンデータの読み込みエラー:', error);
+        console.error('レッスンデータの読み込み中にエラーが発生:', error);
+        setLoadError(error instanceof Error ? error.message : String(error));
         
-        // エラー時はローカルのデフォルトレッスンを使用
+        // ローカルバックアップがある場合はそれを使用
+        try {
+          const savedLessons = localStorage.getItem('lessons');
+          if (savedLessons) {
+            console.log('ローカルストレージからレッスンデータを復元します');
+            const parsedLessons = JSON.parse(savedLessons);
+            setLessons(parsedLessons);
+            setIsLoadingLessons(false);
+            return;
+          }
+        } catch (localError) {
+          console.error('ローカルストレージからの復元にも失敗:', localError);
+        }
+        
+        // エラー時はデフォルトレッスンを使用
+        console.log('エラーのため、デフォルトレッスンを使用します');
         setLessons(DEFAULT_LESSONS);
         localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
         
@@ -221,6 +299,8 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
         } catch (e) {
           console.error('エラー後のAPI保存も失敗:', e);
         }
+      } finally {
+        setIsLoadingLessons(false);
       }
     };
 
@@ -1043,7 +1123,18 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
 
   return (
     <div className="w-full">
-      {(isAdding || isEditing) ? (
+      {isLoadingLessons ? (
+        <div className="flex flex-col items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600">レッスンデータを読み込み中...</p>
+        </div>
+      ) : loadError ? (
+        <div className="p-4 border border-red-300 bg-red-50 rounded-md mb-4">
+          <h3 className="text-red-700 font-medium mb-2">データ読み込みエラー</h3>
+          <p className="text-red-600 mb-4">{loadError}</p>
+          <p className="text-gray-700">デフォルトレッスンを表示しています。このまま編集可能です。</p>
+        </div>
+      ) : (isAdding || isEditing) ? (
         // レッスン編集フォーム（変更なし）
         <div className="bg-white rounded-lg shadow-md p-4">
           <h2 className="text-xl font-semibold mb-4">

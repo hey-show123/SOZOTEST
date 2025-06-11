@@ -12,17 +12,62 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || HARDCODED_SUPABASE_U
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || HARDCODED_SUPABASE_KEY;
 
 console.log('========== Supabase接続情報 ==========');
+console.log('環境:', process.env.NODE_ENV);
 console.log('URL:', supabaseUrl);
 console.log('Key (最初の10文字):', supabaseAnonKey.substring(0, 10) + '...');
 
-// Supabaseクライアントの作成（シンプルに直接作成）
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Supabaseクライアントのオプション設定
+const supabaseOptions = {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'x-application-name': 'sozo-english-app'
+    }
+  },
+  // デバッグ出力
+  debug: process.env.NODE_ENV === 'development'
+};
 
-// Supabaseクライアントの接続確認
-console.log('Supabaseクライアント初期化完了');
-supabase.auth.getSession()
-  .then(() => console.log('✅ Supabase接続確認: 成功'))
-  .catch(err => console.error('❌ Supabase接続失敗:', err));
+// 接続をより堅牢に
+let supabase: SupabaseClient;
+try {
+  // Supabaseクライアントの作成
+  supabase = createClient(supabaseUrl, supabaseAnonKey, supabaseOptions);
+  console.log('Supabaseクライアント初期化完了');
+
+  // 接続テスト
+  (async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        throw error;
+      }
+      console.log('✅ Supabase接続確認: 成功');
+    } catch (err) {
+      console.error('❌ Supabase接続失敗:', err);
+      // 接続失敗時に再試行
+      setTimeout(async () => {
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) {
+            throw error;
+          }
+          console.log('✅ Supabase接続確認 (再試行): 成功');
+        } catch (retryErr) {
+          console.error('❌ Supabase接続失敗 (再試行):', retryErr);
+        }
+      }, 2000);
+    }
+  })();
+} catch (initError) {
+  console.error('❌ Supabaseクライアント初期化エラー:', initError);
+  // フォールバックとして基本的なクライアントを作成
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+}
 
 // レッスンデータ用のテーブル名
 export const LESSONS_TABLE = 'lessons';
