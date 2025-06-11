@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAdmin } from '../context/AdminContext';
+import { useAdmin } from '@/app/context/AdminContext';
 import Link from 'next/link';
 
 export default function AdminLoginPage() {

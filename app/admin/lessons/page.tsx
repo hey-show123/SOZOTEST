@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAdmin } from '../../context/AdminContext';
+import { useAdmin } from '@/app/context/AdminContext';
 import Link from 'next/link';
 import LessonManager from '../../components/lessons/LessonManager';
 import { Lesson } from '../../components/lessons/LessonManager';
