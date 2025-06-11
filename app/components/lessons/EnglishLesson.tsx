@@ -163,6 +163,22 @@ export default function EnglishLesson() {
         <div className="flex items-center justify-center h-full bg-gray-100 p-4">
           <div className="text-center">
             <p className="text-gray-500 mb-2">PDFが設定されていません</p>
+            <p className="text-sm text-gray-600 mb-4">PDFがなくてもレッスンを進めることができます</p>
+            {currentStage === LessonStage.INTRODUCTION ? (
+              <button 
+                onClick={() => handleStageComplete(LessonStage.INTRODUCTION)}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              >
+                レッスンを始める
+              </button>
+            ) : (
+              <button 
+                onClick={() => handleStageComplete(currentStage)}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+              >
+                次のステップへ進む
+              </button>
+            )}
           </div>
         </div>
       );

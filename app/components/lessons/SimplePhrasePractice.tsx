@@ -41,6 +41,21 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     '/images/avatar/robot2.png'
   ];
 
+  // デフォルトアバターへのフォールバック処理
+  const getAvatarImageSrc = (index: number) => {
+    // propsで指定されたアバター画像があればそれを使用
+    if (avatarImage) return avatarImage;
+    
+    // アバター画像配列から取得
+    try {
+      return avatarImages[index];
+    } catch (error) {
+      console.error('アバター画像の取得エラー:', error);
+      // デフォルトのアバター画像を返す
+      return '/images/avatar/robot1.png';
+    }
+  };
+
   // アバター画像を切り替えるための効果
   useEffect(() => {
     if (isAvatarSpeaking) {
@@ -146,7 +161,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         <div className={`relative w-48 h-48 mb-4 ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
           {/* アニメーションするアバター画像 */}
           <Image 
-            src={avatarImages[currentAvatarIndex]}
+            src={getAvatarImageSrc(currentAvatarIndex)}
             alt="SOZO Assistant"
             fill
             priority
