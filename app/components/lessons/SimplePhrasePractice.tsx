@@ -170,7 +170,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         
         {/* アバターとアシスタント名 */}
         <div className="flex items-center mb-6">
-          <div className={`relative w-24 h-24 bg-blue-100 rounded-full overflow-hidden mr-4 flex-shrink-0 ${isAvatarSpeaking ? 'animate-pulse border-2 border-blue-400' : ''}`}>
+          <div className={`relative w-24 h-24 rounded-full overflow-hidden mr-4 flex-shrink-0 ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
             {/* アニメーションするアバター画像 */}
             <Image 
               src={avatarImages[currentAvatarIndex]}
