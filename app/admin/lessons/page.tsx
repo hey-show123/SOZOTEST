@@ -56,6 +56,14 @@ export default function AdminLessonsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {process.env.NEXT_PUBLIC_USE_DUMMY_OPENAI === 'true' && (
+          <div className="mb-6 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700">
+            <h3 className="font-bold">⚠️ 警告: OpenAI APIキーが設定されていません</h3>
+            <p>有効なOpenAI APIキーが設定されていないため、TTS音声生成機能は動作しません。</p>
+            <p>音声生成を有効にするには、<code>.env.local</code>ファイルに有効なAPIキーを設定してください。</p>
+          </div>
+        )}
+        
         <div className="bg-white shadow rounded-lg">
           <div className="p-6">
             <div className="mb-6">

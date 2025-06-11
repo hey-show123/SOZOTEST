@@ -27,6 +27,17 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// OpenAI APIキーが有効かどうかチェック
+const isValidOpenAIKey = process.env.OPENAI_API_KEY && 
+                        process.env.OPENAI_API_KEY !== 'dummy_key' && 
+                        process.env.OPENAI_API_KEY.startsWith('sk-');
+
+// APIキーが設定されていない場合に環境変数を設定
+if (!isValidOpenAIKey) {
+  console.warn('有効なOpenAI APIキーが設定されていません。TTS機能は利用できません。');
+  process.env.NEXT_PUBLIC_USE_DUMMY_OPENAI = 'true';
+}
+
 // ルートハンドラーの設定
 export const config = {
   api: {
@@ -178,6 +189,13 @@ function ensureDirectoryExists(dir: string): void {
 // POSTリクエスト処理
 export async function POST(req: Request) {
   try {
+    // APIキーのチェック
+    if (!isValidOpenAIKey) {
+      return NextResponse.json({ 
+        error: 'OpenAI APIキーが設定されていないか無効です。.env.localファイルで有効なAPIキーを設定してください。'
+      }, { status: 503 });
+    }
+
     // リクエストボディの解析
     const { text, voice = 'alloy', model = 'tts-1', save = false } = await req.json();
 

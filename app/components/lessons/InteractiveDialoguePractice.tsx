@@ -77,6 +77,7 @@ export default function InteractiveDialoguePractice({
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const [isCustomerSpeaking, setIsCustomerSpeaking] = useState(false);
   const [isStaffSpeaking, setIsStaffSpeaking] = useState(false);
+  const [currentLine, setCurrentLine] = useState<DialogueLine | null>(null);
   
   // アバター画像の配列
   const avatarImages = [
@@ -98,9 +99,6 @@ export default function InteractiveDialoguePractice({
   // 会話履歴の自動スクロール用のref
   const conversationEndRef = useRef<HTMLDivElement>(null);
 
-  // 現在の会話ライン
-  const currentLine = dialogue.find(line => line.turnNumber === currentTurn);
-  
   // 会話履歴を自動スクロール
   useEffect(() => {
     if (conversationEndRef.current) {
@@ -145,21 +143,29 @@ export default function InteractiveDialoguePractice({
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
-    setIsAvatarSpeaking(false); // 音声再生が終わったらアバターの会話状態を解除
     
-    // 顧客のセリフの再生が終わったら
+    // 現在のターンがお客さんの場合は自動で次へ進む
     if (currentLine && currentLine.role === 'customer') {
-      // 少し待ってから次のターンへ
+      setIsAvatarSpeaking(false);
       setTimeout(() => {
-        if (currentTurn < dialogue.length) {
-          setCurrentTurn(currentTurn + 1);
+        const nextTurn = currentTurn + 1;
+        setCurrentTurn(nextTurn);
+        
+        // 次の行がある場合は設定
+        if (nextTurn <= dialogue.length) {
+          setCurrentLine(dialogue[nextTurn - 1]);
         } else {
-          // 会話完了、次のセクションへ
-          setTimeout(() => {
-            onComplete();
-          }, 1500);
+          setCurrentLine(null);
         }
-      }, 1500);
+        
+        // スタッフのターンに入ったら自動再生する
+        if (nextTurn <= dialogue.length && dialogue[nextTurn - 1].role === 'staff') {
+          playDialogueAudio(dialogue[nextTurn - 1]);
+        }
+      }, 1000);
+    } else {
+      // スタッフのターンの場合は音声プレイヤーのみ止める
+      setIsStaffSpeaking(false);
     }
   };
 

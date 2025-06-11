@@ -70,37 +70,55 @@ export default function AudioPlayer({
         setIsPlaying(false);
         setShowPlayButton(false);
         
-        // TTS APIを呼び出し
-        const response = await fetch('/api/text-to-speech', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text, voice }),
-        });
+        // APIキーが設定されていない場合やAPIサーバーに問題がある場合のエラーハンドリング
+        try {
+          // TTS APIを呼び出し
+          const response = await fetch('/api/text-to-speech', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text, voice }),
+          });
 
-        if (!response.ok) {
-          throw new Error('TTS APIエラー');
-        }
-
-        if (response.headers.get('Content-Type')?.includes('application/json')) {
-          // JSONレスポンスの場合（保存済みの音声URLが返された）
-          const data = await response.json();
-          setAudioUrl(data.audioUrl);
-        } else {
-          // バイナリレスポンスの場合（新規生成された音声）
-          // 音声データを取得してBlobに変換
-          const audioBlob = await response.blob();
-          // 既存のURLを解放
-          if (audioUrl) {
-            URL.revokeObjectURL(audioUrl);
+          if (!response.ok) {
+            console.error('TTS APIエラー:', response.status, response.statusText);
+            // エラーが発生した場合はフォールバック：再生ボタンを表示せず、完了ハンドラを呼び出す
+            if (onFinished) {
+              onFinished();
+            }
+            return;
           }
-          const newAudioUrl = URL.createObjectURL(audioBlob);
-          setAudioUrl(newAudioUrl);
+
+          if (response.headers.get('Content-Type')?.includes('application/json')) {
+            // JSONレスポンスの場合（保存済みの音声URLが返された）
+            const data = await response.json();
+            setAudioUrl(data.audioUrl);
+          } else {
+            // バイナリレスポンスの場合（新規生成された音声）
+            // 音声データを取得してBlobに変換
+            const audioBlob = await response.blob();
+            // 既存のURLを解放
+            if (audioUrl) {
+              URL.revokeObjectURL(audioUrl);
+            }
+            const newAudioUrl = URL.createObjectURL(audioBlob);
+            setAudioUrl(newAudioUrl);
+          }
+        } catch (error) {
+          console.error('音声生成エラー:', error);
+          setShowPlayButton(false);
+          // エラー時は再生を行わず、完了ハンドラを呼び出して処理を続行
+          if (onFinished) {
+            onFinished();
+          }
         }
       } catch (error) {
-        console.error('音声生成エラー:', error);
-        setShowPlayButton(false);
+        console.error('TTS生成処理エラー:', error);
+        // 最終的なエラーハンドリング：完了ハンドラを呼び出して処理を続行
+        if (onFinished) {
+          onFinished();
+        }
       }
     };
 
