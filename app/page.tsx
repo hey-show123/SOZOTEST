@@ -7,24 +7,18 @@ import { ModelProvider } from './context/ModelContext';
 import { useEffect } from 'react';
 
 function HomePage() {
-  // ページロード時にカスタムイベントを発生させて、AIレッスンモードを自動選択
+  // ページロード時にカスタムイベントを発生させて、レッスンを自動開始
   useEffect(() => {
     // DOM要素が完全に読み込まれてから実行
     const timer = setTimeout(() => {
       try {
-        // カスタムイベントを作成して「AIレッスン」モードを選択
-        const setLessonModeEvent = new CustomEvent('set-lesson-mode', {
-          detail: { mode: 'ai-lesson' }
-        });
-        window.dispatchEvent(setLessonModeEvent);
-        
         // レッスン開始イベントを発生させる
         const startLessonEvent = new CustomEvent('start-lesson');
         window.dispatchEvent(startLessonEvent);
         
-        console.log('AIレッスンモードを自動設定しました');
+        console.log('レッスンを自動開始しました');
       } catch (error) {
-        console.error('AIレッスンモードの自動設定に失敗しました:', error);
+        console.error('レッスンの自動開始に失敗しました:', error);
       }
     }, 500); // 少し遅延させてDOM読み込み完了を待つ
 

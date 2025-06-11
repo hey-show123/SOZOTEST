@@ -33,7 +33,7 @@ declare global {
 }
 
 export default function Chat() {
-  const { mode } = useChatMode();
+  // AIレッスンモードのみを使用
   const { ttsModel, ttsPromptSettings } = useModel();
   const { voice } = useVoice();
   const [messages, setMessages] = useState<Message[]>([
@@ -199,11 +199,14 @@ export default function Chat() {
 
         const data = await response.json();
         
-        // 翻訳を保存
+        // 翻訳を追加
         setMessages(prev => {
-          const updated = [...prev];
-          updated[index + 1] = { ...message, translation: data.translation };
-          return updated;
+          const updatedMessages = [...prev];
+          updatedMessages[index + 1] = {
+            ...updatedMessages[index + 1],
+            translation: data.translation
+          };
+          return updatedMessages;
         });
       } catch (error) {
         console.error('翻訳エラー:', error);
@@ -212,7 +215,7 @@ export default function Chat() {
       }
     }
     
-    // 翻訳表示の切り替え
+    // 翻訳表示の状態を切り替え
     setShowTranslations(prev => ({
       ...prev,
       [index]: !prev[index]
@@ -224,7 +227,7 @@ export default function Chat() {
     if (text && text.trim() !== '') {
       console.log(`音声認識結果: "${text}"`);
       
-      // 自動送信が有効な場合
+      // 自動送信のロジック
       if (autoSubmit) {
         const currentTime = Date.now();
         const timeSinceLastSent = currentTime - lastSentTime;
@@ -242,35 +245,35 @@ export default function Chat() {
     }
   };
 
-  // メッセージを送信（音声認識からの直接送信用）
+  // メッセージ送信処理
   const handleSubmitMessage = async (messageText: string) => {
-    if (messageText.trim() === '' || isLoading) return;
-
-    // ユーザーメッセージを追加
-    const userMessage: Message = { role: 'user', content: messageText };
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
+    if (!messageText.trim()) return;
     
-    // 最後に送信したメッセージと時間を記録
     setLastSentMessage(messageText);
     setLastSentTime(Date.now());
-
+    
+    // ユーザーメッセージをチャットに追加
+    const userMessage: Message = { role: 'user', content: messageText };
+    setMessages(prev => [...prev, userMessage]);
+    
+    // 応答取得中のローディング状態を設定
+    setIsLoading(true);
+    
     try {
-      // APIリクエスト
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: [...messages, userMessage].filter(msg => msg.role !== 'system' || messages.indexOf(msg) === 0),
+          messages: [...messages, userMessage],
         }),
       });
-
+      
       if (!response.ok) {
         throw new Error('API応答エラー');
       }
-
+      
       const data = await response.json();
       
       // アシスタントの応答を追加
@@ -279,106 +282,90 @@ export default function Chat() {
       // 音声を生成してキャッシュ
       await generateAudioForMessage(data.message);
     } catch (error) {
-      console.error('エラー:', error);
-      // エラーメッセージを表示
+      console.error('メッセージ送信エラー:', error);
+      
+      // エラー時には汎用エラーメッセージを表示
       setMessages(prev => [...prev, { role: 'assistant', content: ERROR_MESSAGE }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // メッセージの音声を生成してキャッシュする関数
+  // テキスト入力フォームのサブミット処理
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const messageText = formData.get('message') as string;
+    
+    // メッセージを送信
+    handleSubmitMessage(messageText);
+    
+    // 入力フォームをクリア
+    (e.target as HTMLFormElement).reset();
+  };
+
+  // アシスタントのメッセージに音声を生成してキャッシュする
   const generateAudioForMessage = async (message: Message) => {
+    if (message.role !== 'assistant') return;
+    
     try {
-      // TTS APIを呼び出し
-      const response = await fetch('/api/tts', {
+      const response = await fetch('/api/text-to-speech', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          text: message.content, 
-          voice, 
+        body: JSON.stringify({
+          text: message.content,
           model: ttsModel,
-          useCustomPrompt: ttsPromptSettings.useCustomPrompt,
-          ttsPrompt: ttsPromptSettings.voicePrompt
+          voice: voice,
+          ...ttsPromptSettings
         }),
       });
-
-      if (!response.ok) {
-        throw new Error('TTS APIエラー');
-      }
-
-      // 音声データを取得してBlobに変換
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
       
-      // メッセージに音声URLを追加
+      if (!response.ok) {
+        throw new Error('TTS API応答エラー');
+      }
+      
+      const data = await response.json();
+      
+      // 音声URLをメッセージに追加
       setMessages(prev => {
-        const newMessages = [...prev];
-        const messageIndex = newMessages.findIndex(msg => 
-          msg.role === 'assistant' && 
-          msg.content === message.content
-        );
-        
-        if (messageIndex !== -1) {
-          newMessages[messageIndex] = {
-            ...newMessages[messageIndex],
-            audioUrl
+        const updatedMessages = [...prev];
+        const lastIndex = updatedMessages.length - 1;
+        if (updatedMessages[lastIndex].role === 'assistant') {
+          updatedMessages[lastIndex] = {
+            ...updatedMessages[lastIndex],
+            audioUrl: data.audioUrl
           };
         }
-        
-        return newMessages;
+        return updatedMessages;
       });
-      
-      // 最初の応答は自動的に音声を再生
-      setCurrentTtsText(message.content);
     } catch (error) {
       console.error('音声生成エラー:', error);
     }
   };
 
-  // 音声を再生する関数
+  // アシスタントのメッセージの音声を再生
   const playMessageAudio = (message: Message) => {
     if (message.audioUrl) {
-      // キャッシュされた音声を再生
+      setCurrentTtsText('');
+      
+      // 音声ファイルを再生
       const audio = new Audio(message.audioUrl);
-      audio.play().catch(error => console.error('音声再生エラー:', error));
-    } else {
-      // 音声がキャッシュされていない場合はテキストを使って再生
+      audio.play().catch(error => {
+        console.error('音声再生エラー:', error);
+      });
+    } else if (message.content) {
+      // 音声URLがない場合は、TTSで生成して再生
       setCurrentTtsText(message.content);
     }
   };
 
-  // サーバーサイドレンダリング時に一貫性のある内容を返す
-  if (!isClient) {
-    return (
-      <div className="flex flex-col h-[80vh] max-w-2xl mx-auto bg-white rounded-lg shadow-md">
-        <div className="flex-1 p-4 overflow-y-auto">
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-semibold mb-2">
-                チャット読み込み中...
-              </h2>
-            </div>
-          </div>
-        </div>
-        <div className="p-4 border-t">
-          <div className="text-center text-gray-500">
-            読み込み中...
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // メインコンテンツをレンダリング
   return (
-    <div className="flex flex-col h-[80vh] max-w-5xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl card-fancy">
-      {/* TTSプレーヤー（非表示） */}
-      <AudioPlayer text={currentTtsText} autoPlay={true} />
-
-      {/* レッスンコンポーネントを表示 */}
-        <EnglishLesson />
+    <div className="flex flex-col h-screen max-h-screen bg-transparent">
+      {/* AIレッスンを表示 */}
+      <EnglishLesson />
     </div>
   );
 } 

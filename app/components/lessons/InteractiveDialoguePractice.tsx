@@ -73,6 +73,10 @@ export default function InteractiveDialoguePractice({
   const [conversationHistory, setConversationHistory] = useState<ConversationItem[]>([]);
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
   const [currentAvatarIndex, setCurrentAvatarIndex] = useState(0); // 現在表示中のアバター画像インデックス
+  const [currentTtsText, setCurrentTtsText] = useState('');
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
+  const [isCustomerSpeaking, setIsCustomerSpeaking] = useState(false);
+  const [isStaffSpeaking, setIsStaffSpeaking] = useState(false);
   
   // アバター画像の配列
   const avatarImages = [
@@ -269,6 +273,29 @@ export default function InteractiveDialoguePractice({
     setIsAvatarSpeaking(false);
   };
 
+  // 会話ターンの音声を再生
+  const playDialogueAudio = (turn: DialogueTurn) => {
+    // 事前生成された音声ファイルがある場合はそれを優先
+    if (turn.audioUrl) {
+      setCurrentAudioUrl(turn.audioUrl);
+      setCurrentTtsText('');
+    } else {
+      setCurrentTtsText(turn.text);
+      setCurrentAudioUrl(null);
+    }
+    
+    setIsAudioPlaying(true);
+    
+    // 話者に応じてアバターの状態を設定
+    if (turn.role === 'customer') {
+      setIsCustomerSpeaking(true);
+      setIsStaffSpeaking(false);
+    } else {
+      setIsCustomerSpeaking(false);
+      setIsStaffSpeaking(true);
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-4 overflow-auto relative">
       {/* 背景画像 */}
@@ -350,7 +377,7 @@ export default function InteractiveDialoguePractice({
 
             <div className="flex flex-wrap justify-center gap-2 sm:space-x-4">
               <button
-                onClick={() => playPhrase(currentLine.text)}
+                onClick={() => playDialogueAudio(currentLine)}
                 className="flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm sm:text-base"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1 sm:mr-2" viewBox="0 0 16 16">
@@ -430,16 +457,15 @@ export default function InteractiveDialoguePractice({
           </div>
         )}
 
-        {/* 音声プレーヤー */}
-        <div className={isAudioPlaying ? "" : "hidden"}>
-          <AudioPlayer 
-            text={audioText} 
-            autoPlay={true} 
-            onFinished={handleAudioFinished}
-            isPlaying={isAudioPlaying}
-            setIsPlaying={setIsAudioPlaying}
-          />
-        </div>
+        {/* 音声プレーヤー（非表示） */}
+        <AudioPlayer 
+          text={currentTtsText}
+          audioUrl={currentAudioUrl}
+          autoPlay={isAudioPlaying}
+          onFinished={handleAudioFinished}
+          isPlaying={isAudioPlaying}
+          setIsPlaying={setIsAudioPlaying}
+        />
       </div>
       
       <div className="text-center mt-3 text-xs sm:text-sm text-gray-500">

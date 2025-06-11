@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 export type Phrase = {
   text: string;
   translation: string;
+  audioUrl?: string;
 };
 
 export type DialogueTurn = {
@@ -12,6 +13,7 @@ export type DialogueTurn = {
   text: string;
   translation: string;
   turnNumber: number;
+  audioUrl?: string;
 };
 
 export type Goal = {
@@ -33,6 +35,7 @@ export type Lesson = {
   goals?: Goal[];
   headerTitle?: string;
   startButtonText?: string;
+  audioGenerated?: boolean;
 };
 
 // デフォルトのダイアログ
@@ -127,22 +130,69 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     startButtonText: ''
   });
 
-  // コンポーネントマウント時にローカルストレージからレッスンを読み込む
+  // コンポーネントマウント時にレッスンを読み込む
   useEffect(() => {
-    try {
-      const savedLessons = localStorage.getItem('lessons');
-      if (savedLessons) {
-        setLessons(JSON.parse(savedLessons));
-      } else {
-        // 初期レッスンの保存
+    // レッスンデータを取得する
+    const fetchLessons = async () => {
+      try {
+        // API経由でレッスンデータを取得
+        const response = await fetch('/api/lessons');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.lessons && Array.isArray(data.lessons) && data.lessons.length > 0) {
+            console.log('APIからレッスンデータを取得しました');
+            setLessons(data.lessons);
+            localStorage.setItem('lessons', JSON.stringify(data.lessons));
+            return;
+          }
+        }
+        
+        // APIから取得できない場合はローカルストレージから取得
+        const savedLessons = localStorage.getItem('lessons');
+        if (savedLessons) {
+          console.log('ローカルストレージからレッスンデータを取得しました');
+          setLessons(JSON.parse(savedLessons));
+        } else {
+          // 初期レッスンの保存
+          console.log('デフォルトのレッスンデータを使用します');
+          setLessons(DEFAULT_LESSONS);
+          localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
+          
+          // APIにも保存
+          saveLessonsToAPI(DEFAULT_LESSONS);
+        }
+      } catch (error) {
+        console.error('レッスンデータの読み込みエラー:', error);
+        
+        // エラー時はローカルのデフォルトレッスンを使用
         setLessons(DEFAULT_LESSONS);
         localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
       }
-    } catch (error) {
-      console.error('レッスンデータの読み込みエラー:', error);
-      setLessons(DEFAULT_LESSONS);
-    }
+    };
+
+    fetchLessons();
   }, []);
+
+  // APIにレッスンデータを保存する関数
+  const saveLessonsToAPI = async (lessonsData: Lesson[]) => {
+    try {
+      const response = await fetch('/api/lessons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ lessons: lessonsData }),
+      });
+
+      if (!response.ok) {
+        console.error('APIへのレッスンデータ保存に失敗しました');
+      } else {
+        console.log('APIにレッスンデータを保存しました');
+      }
+    } catch (error) {
+      console.error('APIへのレッスンデータ保存エラー:', error);
+    }
+  };
 
   // 現在選択されているレッスンを設定
   useEffect(() => {
@@ -433,20 +483,21 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       .filter(tag => tag);
 
     const newLesson: Lesson = {
-      id: formData.id,
+      id: isEditing && currentLesson ? currentLesson.id : `lesson-${Date.now()}`,
       title: formData.title,
       description: formData.description,
       pdfUrl: formData.pdfUrl || undefined,
       systemPrompt: formData.systemPrompt || undefined,
       level: formData.level,
       tags: tagsArray,
-      createdAt: isAdding ? Date.now() : (currentLesson?.createdAt || Date.now()),
+      createdAt: isEditing && currentLesson ? currentLesson.createdAt : Date.now(),
       updatedAt: Date.now(),
       keyPhrase,
       dialogueTurns,
       goals: goals.length > 0 ? goals : undefined,
       headerTitle: formData.headerTitle.trim() || undefined,
-      startButtonText: formData.startButtonText.trim() || undefined
+      startButtonText: formData.startButtonText.trim() || undefined,
+      audioGenerated: false
     };
 
     let updatedLessons: Lesson[];
@@ -459,11 +510,10 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     }
 
     setLessons(updatedLessons);
-    try {
-      localStorage.setItem('lessons', JSON.stringify(updatedLessons));
-    } catch (error) {
-      console.error('レッスンデータの保存エラー:', error);
-    }
+    localStorage.setItem('lessons', JSON.stringify(updatedLessons));
+    
+    // APIにも保存
+    saveLessonsToAPI(updatedLessons);
 
     setIsAdding(false);
     setIsEditing(false);
@@ -473,19 +523,20 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
 
   // レッスン削除
   const handleDeleteLesson = (id: string) => {
-    if (window.confirm('このレッスンを削除してもよろしいですか？')) {
-      const updatedLessons = lessons.filter(lesson => lesson.id !== id);
-      setLessons(updatedLessons);
-      
-      try {
-        localStorage.setItem('lessons', JSON.stringify(updatedLessons));
-      } catch (error) {
-        console.error('レッスンデータの保存エラー:', error);
-      }
-
-      if (currentLesson?.id === id && updatedLessons.length > 0) {
-        setCurrentLesson(updatedLessons[0]);
-        onSelectLesson(updatedLessons[0]);
+    const filteredLessons = lessons.filter(lesson => lesson.id !== id);
+    setLessons(filteredLessons);
+    localStorage.setItem('lessons', JSON.stringify(filteredLessons));
+    
+    // APIにも保存
+    saveLessonsToAPI(filteredLessons);
+    
+    // 現在選択されているレッスンが削除対象の場合は、別のレッスンを選択
+    if (currentLesson && currentLesson.id === id) {
+      if (filteredLessons.length > 0) {
+        setCurrentLesson(filteredLessons[0]);
+        onSelectLesson(filteredLessons[0]);
+      } else {
+        setCurrentLesson(null);
       }
     }
   };
@@ -646,7 +697,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
         // インポート前に確認
         if (window.confirm(`${importedLessons.length}件のレッスンをインポートします。既存のレッスンデータは上書きされます。よろしいですか？`)) {
           setLessons(importedLessons);
-          localStorage.setItem('lessons', jsonData);
+          localStorage.setItem('lessons', JSON.stringify(importedLessons));
           alert('レッスンデータのインポートが完了しました。');
           
           // 現在選択中のレッスンがあれば更新
@@ -673,6 +724,114 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     };
     
     reader.readAsText(file);
+  };
+
+  // TTS音声を生成する関数
+  const generateAudioForLesson = async (lesson: Lesson) => {
+    if (lesson.audioGenerated) {
+      if (!confirm('音声はすでに生成されています。再生成しますか？')) {
+        return;
+      }
+    }
+    
+    setUploadStatus('uploading');
+    setUploadMessage('レッスン音声を生成中...');
+    
+    try {
+      // 更新用のレッスンコピーを作成
+      const updatedLesson = { ...lesson };
+      
+      // キーフレーズの音声を生成
+      if (updatedLesson.keyPhrase) {
+        const response = await fetch('/api/text-to-speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: updatedLesson.keyPhrase.text,
+            voice: 'nova', // デフォルトの声
+            model: 'tts-1-hd', // 高品質モデル
+            save: true // ファイルとして保存
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('キーフレーズの音声生成に失敗しました');
+        }
+        
+        const data = await response.json();
+        updatedLesson.keyPhrase.audioUrl = data.audioUrl;
+      }
+      
+      // ダイアログの音声を生成
+      if (updatedLesson.dialogueTurns) {
+        for (let i = 0; i < updatedLesson.dialogueTurns.length; i++) {
+          const turn = updatedLesson.dialogueTurns[i];
+          
+          // スタッフの音声はノヴァ、顧客の音声はオニキスで生成
+          const voice = turn.role === 'staff' ? 'nova' : 'onyx';
+          
+          const response = await fetch('/api/text-to-speech', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: turn.text,
+              voice: voice,
+              model: 'tts-1-hd', // 高品質モデル
+              save: true // ファイルとして保存
+            }),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`ダイアログターン ${i+1} の音声生成に失敗しました`);
+          }
+          
+          const data = await response.json();
+          updatedLesson.dialogueTurns[i].audioUrl = data.audioUrl;
+          
+          // 進捗状況を更新
+          setUploadMessage(`ダイアログ ${i+1}/${updatedLesson.dialogueTurns.length} の音声を生成中...`);
+        }
+      }
+      
+      // 音声生成完了フラグをセット
+      updatedLesson.audioGenerated = true;
+      updatedLesson.updatedAt = Date.now();
+      
+      // レッスンデータを更新
+      const updatedLessons = lessons.map(l => 
+        l.id === updatedLesson.id ? updatedLesson : l
+      );
+      
+      setLessons(updatedLessons);
+      localStorage.setItem('lessons', JSON.stringify(updatedLessons));
+      
+      // APIにも保存
+      saveLessonsToAPI(updatedLessons);
+      
+      setUploadStatus('success');
+      setUploadMessage('レッスン音声の生成が完了しました');
+      
+      // 現在のレッスンを更新
+      if (currentLesson && currentLesson.id === updatedLesson.id) {
+        setCurrentLesson(updatedLesson);
+        onSelectLesson(updatedLesson);
+      }
+      
+      // 3秒後にメッセージをクリア
+      setTimeout(() => {
+        setUploadStatus('idle');
+        setUploadMessage('');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('音声生成エラー:', error);
+      setUploadStatus('error');
+      setUploadMessage('レッスン音声の生成に失敗しました');
+    }
   };
 
   return (
@@ -1159,13 +1318,29 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleDeleteLesson(lesson.id)}
-                        className="p-1 text-red-500 hover:bg-red-100 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          generateAudioForLesson(lesson);
+                        }}
+                        className="p-1 text-green-600 hover:text-green-800"
+                        title="音声生成"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`「${lesson.title}」を削除してもよろしいですか？`)) {
+                            handleDeleteLesson(lesson.id);
+                          }
+                        }}
+                        className="p-1 text-red-600 hover:text-red-800"
                         title="削除"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0v-6z"/>
-                          <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     </div>

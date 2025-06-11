@@ -10,6 +10,7 @@ type AudioPlayerProps = {
   onFinished?: () => void;
   isPlaying?: boolean;
   setIsPlaying?: (isPlaying: boolean) => void;
+  audioUrl?: string; // 事前生成された音声ファイルのURL
 };
 
 export default function AudioPlayer({ 
@@ -17,7 +18,8 @@ export default function AudioPlayer({
   autoPlay, 
   onFinished,
   isPlaying: externalIsPlaying,
-  setIsPlaying: externalSetIsPlaying
+  setIsPlaying: externalSetIsPlaying,
+  audioUrl: externalAudioUrl
 }: AudioPlayerProps) {
   const { mode } = useChatMode();
   const { voice } = useVoice();
@@ -54,8 +56,13 @@ export default function AudioPlayer({
     };
   }, []);
 
-  // テキストが変更されたら音声を生成
+  // 外部から音声URLが提供されている場合はそれを使用
   useEffect(() => {
+    if (externalAudioUrl) {
+      setAudioUrl(externalAudioUrl);
+      return; // 外部URLがある場合はAPIを呼び出さない
+    }
+    
     if (!text || text.trim() === '') return;
 
     const generateTTS = async () => {
@@ -64,7 +71,7 @@ export default function AudioPlayer({
         setShowPlayButton(false);
         
         // TTS APIを呼び出し
-        const response = await fetch('/api/tts', {
+        const response = await fetch('/api/text-to-speech', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -76,14 +83,21 @@ export default function AudioPlayer({
           throw new Error('TTS APIエラー');
         }
 
-        // 音声データを取得してBlobに変換
-        const audioBlob = await response.blob();
-        // 既存のURLを解放
-        if (audioUrl) {
-          URL.revokeObjectURL(audioUrl);
+        if (response.headers.get('Content-Type')?.includes('application/json')) {
+          // JSONレスポンスの場合（保存済みの音声URLが返された）
+          const data = await response.json();
+          setAudioUrl(data.audioUrl);
+        } else {
+          // バイナリレスポンスの場合（新規生成された音声）
+          // 音声データを取得してBlobに変換
+          const audioBlob = await response.blob();
+          // 既存のURLを解放
+          if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+          }
+          const newAudioUrl = URL.createObjectURL(audioBlob);
+          setAudioUrl(newAudioUrl);
         }
-        const newAudioUrl = URL.createObjectURL(audioBlob);
-        setAudioUrl(newAudioUrl);
       } catch (error) {
         console.error('音声生成エラー:', error);
         setShowPlayButton(false);
@@ -94,11 +108,12 @@ export default function AudioPlayer({
 
     // クリーンアップ関数
     return () => {
-      if (audioUrl) {
+      // Blobから作成したURLのみ解放（サーバー上のファイルパスは解放しない）
+      if (audioUrl && !externalAudioUrl && audioUrl.startsWith('blob:')) {
         URL.revokeObjectURL(audioUrl);
       }
     };
-  }, [text, voice]);
+  }, [text, voice, externalAudioUrl]);
 
   // 音声URLが変更されたときに再生
   useEffect(() => {

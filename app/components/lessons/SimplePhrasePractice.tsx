@@ -29,7 +29,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   const [successCount, setSuccessCount] = useState(0); // 正しい発音に成功した回数
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [showContinueButton, setShowContinueButton] = useState(false);
-  const [audioText, setAudioText] = useState(phraseToUse.text); // 初期値をキーフレーズに設定
+  const [audioText, setAudioText] = useState(''); // 空の文字列から開始（事前生成音声を優先）
   const [initialPlayDone, setInitialPlayDone] = useState(false);
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
   const [avatarFeedback, setAvatarFeedback] = useState(''); // アバターのフィードバックメッセージ
@@ -59,7 +59,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     
     // 少し遅延させて再生（画面表示後に再生するため）
     const timer = setTimeout(() => {
-      setIsAudioPlaying(true);
+      playKeyPhrase();
     }, 500);
     
     return () => clearTimeout(timer);
@@ -117,9 +117,16 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
 
   // キーフレーズを再生
   const playKeyPhrase = () => {
-    setAudioText(phraseToUse.text); // 直接フレーズのみを設定
+    // 事前生成された音声ファイルがある場合はそれを優先、なければテキストを設定
+    setAudioText(phraseToUse.audioUrl ? '' : phraseToUse.text);
     setIsAudioPlaying(true);
     setIsAvatarSpeaking(true); // アバターの会話状態をON
+  };
+
+  // スキップボタンのハンドラー
+  const handleSkip = () => {
+    setShowContinueButton(true);
+    setAvatarFeedback('次に進むね！');
   };
 
   return (
@@ -205,62 +212,55 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
           </div>
         </div>
         
-        {/* テスト用：次に進むボタン */}
-        <div className="flex justify-center mb-6">
-          <button
-            onClick={() => {
-              // 発音成功とみなして次に進む
-              const newSuccessCount = 2; // 2回成功したことにする
-              setSuccessCount(newSuccessCount);
-              setShowContinueButton(true);
-              setFeedbackMessage('素晴らしい発音です！次のセクションに進みましょう。');
-            }}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-          >
-            次に進む
-          </button>
-        </div>
-        
-        {/* フィードバックメッセージ */}
         {userAnswer && (
-          <div className={`rounded-lg p-4 mb-6 text-center ${
-            feedbackMessage.includes('素晴らしい') 
-              ? 'text-green-600 font-medium' 
-              : 'text-orange-600 font-medium'
-          }`}>
-            <p className="mb-2">{feedbackMessage}</p>
-            <p className="text-gray-700">あなたの発音: <span className="font-medium">{userAnswer}</span></p>
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2">あなたの発音:</h3>
+            <p className="text-xl bg-white/70 p-3 rounded-lg border border-gray-200">
+              {userAnswer}
+            </p>
+            {feedbackMessage && (
+              <p className={`mt-2 p-2 rounded ${
+                feedbackMessage.includes('素晴らしい') 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {feedbackMessage}
+              </p>
+            )}
           </div>
         )}
         
-        {/* フッターメッセージ */}
-        <p className="text-center text-gray-700 font-medium mb-4">
-          最初の一歩です！がんばろう👍
-        </p>
-        
-        {/* 次へボタン */}
-        {showContinueButton && (
-          <div className="flex justify-center">
-            <button
+        {/* 次に進むボタンとスキップボタン */}
+        <div className="flex justify-center gap-4">
+          {showContinueButton && (
+            <button 
               onClick={onComplete}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium shadow-md transition-transform transform hover:scale-105"
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-lg hover:from-blue-600 hover:to-blue-800 transition-colors shadow-md font-bold"
             >
-              次のセクションへ
+              次に進む
             </button>
-          </div>
-        )}
+          )}
+
+          {!showContinueButton && (
+            <button 
+              onClick={handleSkip}
+              className="px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors shadow-md font-bold"
+            >
+              スキップする
+            </button>
+          )}
+        </div>
       </div>
       
       {/* 音声プレーヤー */}
-      <div className="hidden">
-        <AudioPlayer 
-          text={audioText} 
-          autoPlay={isAudioPlaying} 
-          onFinished={handleAudioFinished}
-          isPlaying={isAudioPlaying}
-          setIsPlaying={setIsAudioPlaying}
-        />
-      </div>
+      <AudioPlayer 
+        text={audioText}
+        audioUrl={phraseToUse.audioUrl}
+        autoPlay={isAudioPlaying} 
+        onFinished={handleAudioFinished}
+        isPlaying={isAudioPlaying}
+        setIsPlaying={setIsAudioPlaying}
+      />
     </div>
   );
 } 
