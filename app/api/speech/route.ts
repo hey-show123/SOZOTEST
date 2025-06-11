@@ -7,6 +7,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// OpenAI APIキーが有効かどうかチェック
+const isValidOpenAIKey = process.env.OPENAI_API_KEY && 
+                        process.env.OPENAI_API_KEY !== 'dummy_key' && 
+                        process.env.OPENAI_API_KEY.startsWith('sk-');
+
 // ルートハンドラーの設定
 export const config = {
   api: {
@@ -33,6 +38,17 @@ interface ErrorWithMessage {
 
 export async function POST(request: Request) {
   try {
+    // APIキーのチェック
+    if (!isValidOpenAIKey) {
+      console.warn('有効なOpenAI APIキーが設定されていません。デモモードで動作します。');
+      // デモレスポンスを返して、フロントエンドが動作し続けるようにする
+      return NextResponse.json({ 
+        text: "Would you like to do a treatment as well?", 
+        isDummy: true,
+        message: 'OpenAI APIキーが設定されていないためデモテキストを返しています。'
+      });
+    }
+
     // フォームデータからファイルを取得
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;

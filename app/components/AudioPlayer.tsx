@@ -93,6 +93,17 @@ export default function AudioPlayer({
           if (response.headers.get('Content-Type')?.includes('application/json')) {
             // JSONレスポンスの場合（保存済みの音声URLが返された）
             const data = await response.json();
+            
+            // ダミーの音声URLの場合は特別処理
+            if (data.isDummy) {
+              console.log('ダミー音声URLが返されました。APIキーが設定されていません。');
+              // ダミーURLでも処理を続行し、完了ハンドラを呼び出す
+              if (onFinished) {
+                onFinished();
+              }
+              return;
+            }
+            
             setAudioUrl(data.audioUrl);
           } else {
             // バイナリレスポンスの場合（新規生成された音声）

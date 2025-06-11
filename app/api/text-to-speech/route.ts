@@ -191,9 +191,13 @@ export async function POST(req: Request) {
   try {
     // APIキーのチェック
     if (!isValidOpenAIKey) {
+      // APIキーが設定されていない場合でもフロントエンドが動作するよう、
+      // エラーではなくダミーの音声URLを返す
       return NextResponse.json({ 
-        error: 'OpenAI APIキーが設定されていないか無効です。.env.localファイルで有効なAPIキーを設定してください。'
-      }, { status: 503 });
+        audioUrl: '/audio/dummy-audio.mp3',
+        message: 'OpenAI APIキーが設定されていないためダミーの音声URLを返しています。',
+        isDummy: true
+      }, { status: 200 });
     }
 
     // リクエストボディの解析
