@@ -12,6 +12,25 @@ export async function GET() {
     console.log('SUPABASE_URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
     console.log('SUPABASE_ANON_KEY exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
     
+    // Supabaseの接続テスト
+    if (supabase) {
+      try {
+        const { data: testData, error: testError } = await supabase
+          .from('_tests_')
+          .select('*')
+          .limit(1)
+          .single();
+          
+        if (testError && testError.code !== 'PGRST116') {  // PGRST116はテーブルが存在しないエラー
+          console.error('Supabase接続テストエラー:', testError);
+        } else {
+          console.log('Supabase接続テスト成功');
+        }
+      } catch (e) {
+        console.error('Supabase接続テスト例外:', e);
+      }
+    }
+    
     // Supabaseが設定されていない場合はデフォルトレッスンを返す
     if (!isSupabaseConfigured) {
       console.log('Supabase未設定: デフォルトレッスンを返します');
@@ -24,15 +43,8 @@ export async function GET() {
       });
     }
     
-    // 開発環境の場合はデフォルトレッスンを返す (この条件を削除して常にSupabaseを使用)
-    // if (isDevelopment) {
-    //   console.log('開発環境: デフォルトレッスンを返します');
-    //   return NextResponse.json({ 
-    //     lessons: DEFAULT_LESSONS
-    //   });
-    // }
-
     // Supabaseからレッスンデータを取得
+    console.log(`Supabaseテーブル「${LESSONS_TABLE}」からデータ取得を試みます`);
     const { data, error } = await supabase
       .from(LESSONS_TABLE)
       .select('*')
@@ -43,16 +55,32 @@ export async function GET() {
       return NextResponse.json({ 
         lessons: DEFAULT_LESSONS,
         error: 'Supabaseからの取得エラー - デフォルトレッスンを返します',
-        debug: { error }
+        debug: { error: error.message, code: error.code }
       });
     }
     
     // データが空の場合はデフォルトレッスンを返す
     if (!data || data.length === 0) {
       console.log('Supabaseにデータなし: デフォルトレッスンを返します');
+      
+      // Supabaseにデフォルトレッスンを保存
+      console.log('デフォルトレッスンをSupabaseに保存します');
+      const { error: insertError } = await supabase
+        .from(LESSONS_TABLE)
+        .insert(DEFAULT_LESSONS);
+        
+      if (insertError) {
+        console.error('デフォルトレッスンの保存エラー:', insertError);
+      } else {
+        console.log('デフォルトレッスンを保存しました');
+      }
+      
       return NextResponse.json({ 
         lessons: DEFAULT_LESSONS,
-        debug: { reason: 'データなし' }
+        debug: { 
+          reason: 'データなし',
+          defaultSaved: !insertError 
+        }
       });
     }
     
@@ -66,7 +94,7 @@ export async function GET() {
     return NextResponse.json({ 
       lessons: DEFAULT_LESSONS,
       error: 'エラー発生 - デフォルトレッスンを返します',
-      debug: { error }
+      debug: { error: error instanceof Error ? error.message : String(error) }
     });
   }
 }
@@ -99,14 +127,47 @@ export async function POST(request: Request) {
       });
     }
     
-    // 開発環境の場合も常にSupabaseに保存する (この条件を削除)
-    // if (isDevelopment) {
-    //   console.log('POST - 開発環境: ローカルのみに保存します');
-    //   return NextResponse.json({ success: true });
-    // }
+    // Supabaseの接続テスト
+    if (supabase) {
+      try {
+        const { data: testData, error: testError } = await supabase
+          .from('_tests_')
+          .select('*')
+          .limit(1)
+          .single();
+          
+        if (testError && testError.code !== 'PGRST116') {  // PGRST116はテーブルが存在しないエラー
+          console.error('POST - Supabase接続テストエラー:', testError);
+        } else {
+          console.log('POST - Supabase接続テスト成功');
+        }
+      } catch (e) {
+        console.error('POST - Supabase接続テスト例外:', e);
+      }
+    }
+    
+    // テーブルの存在確認と作成
+    try {
+      // 簡易的なテーブル存在確認（レコード数の取得）
+      const { count, error: countError } = await supabase
+        .from(LESSONS_TABLE)
+        .select('*', { count: 'exact', head: true });
+        
+      if (countError && countError.code === 'PGRST116') {
+        console.log('POST - レッスンテーブルが存在しません。SQLファイルを実行する必要があります。');
+        return NextResponse.json({ 
+          success: false,
+          error: 'Supabaseにテーブルが存在しません。セットアップが必要です。',
+          debug: { error: countError }
+        });
+      }
+    } catch (e) {
+      console.error('POST - テーブル確認エラー:', e);
+    }
     
     // Supabaseにレッスンデータを保存
     // 一度テーブルをクリア
+    console.log('POST - テーブルの既存データをクリアします');
     const { error: deleteError } = await supabase
       .from(LESSONS_TABLE)
       .delete()
@@ -115,13 +176,14 @@ export async function POST(request: Request) {
     if (deleteError) {
       console.error('POST - Supabaseのレッスンデータ削除エラー:', deleteError);
       return NextResponse.json({ 
-        success: true,  // ローカルには保存されるのでtrueを返す
-        warning: 'Supabaseへの保存に失敗しました',
+        success: false,
+        error: 'Supabaseのデータ削除に失敗しました',
         debug: { deleteError }
       });
     }
     
     // 新しいレッスンデータを挿入
+    console.log(`POST - ${lessons.length}件のレッスンデータを挿入します`);
     const { error: insertError } = await supabase
       .from(LESSONS_TABLE)
       .insert(lessons);
@@ -129,8 +191,8 @@ export async function POST(request: Request) {
     if (insertError) {
       console.error('POST - Supabaseへのレッスンデータ保存エラー:', insertError);
       return NextResponse.json({ 
-        success: true,  // ローカルには保存されるのでtrueを返す
-        warning: 'Supabaseへの保存に失敗しました',
+        success: false,
+        error: 'Supabaseへのデータ保存に失敗しました',
         debug: { insertError }
       });
     }
@@ -145,7 +207,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: false,
       error: 'レッスンデータの保存に失敗しました',
-      debug: { error }
+      debug: { error: error instanceof Error ? error.message : String(error) }
     }, { status: 500 });
   }
 } 

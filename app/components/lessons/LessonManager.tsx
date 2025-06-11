@@ -130,6 +130,27 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     startButtonText: ''
   });
 
+  // フォームをリセットする関数
+  const resetForm = () => {
+    setFormData({
+      id: '',
+      title: '',
+      description: '',
+      pdfUrl: '',
+      systemPrompt: '',
+      level: 'beginner',
+      tags: '',
+      keyPhraseText: '',
+      keyPhraseTranslation: '',
+      dialogueText: '',
+      dialogueTurns: [],
+      goalsText: '',
+      headerTitle: '',
+      startButtonText: ''
+    });
+    setCurrentLesson(null);
+  };
+
   // コンポーネントマウント時にレッスンを読み込む
   useEffect(() => {
     // レッスンデータを取得する
@@ -137,21 +158,47 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       try {
         // API経由でレッスンデータを取得
         const response = await fetch('/api/lessons');
+        
+        // デバッグ情報を記録
+        console.log('API Response Status:', response.status);
+        
         if (response.ok) {
           const data = await response.json();
-          if (data.lessons && Array.isArray(data.lessons) && data.lessons.length > 0) {
-            console.log('APIからレッスンデータを取得しました');
+          console.log('API Response Data:', data);
+          
+          if (data.lessons && Array.isArray(data.lessons)) {
+            console.log(`APIから${data.lessons.length}件のレッスンデータを取得しました`);
+            
+            // データが空の場合はデフォルトレッスンを使用して保存
+            if (data.lessons.length === 0) {
+              console.log('APIからのデータが空のため、デフォルトレッスンを使用します');
+              setLessons(DEFAULT_LESSONS);
+              localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
+              
+              // APIにも保存
+              await saveLessonsToAPI(DEFAULT_LESSONS);
+              return;
+            }
+            
             setLessons(data.lessons);
             localStorage.setItem('lessons', JSON.stringify(data.lessons));
             return;
+          } else {
+            console.log('APIからのレッスンデータが無効です:', data);
           }
+        } else {
+          console.error('APIからのレッスンデータ取得に失敗しました:', response.statusText);
         }
         
         // APIから取得できない場合はローカルストレージから取得
         const savedLessons = localStorage.getItem('lessons');
         if (savedLessons) {
           console.log('ローカルストレージからレッスンデータを取得しました');
-          setLessons(JSON.parse(savedLessons));
+          const parsedLessons = JSON.parse(savedLessons);
+          setLessons(parsedLessons);
+          
+          // ローカルデータをAPIにも保存を試みる
+          await saveLessonsToAPI(parsedLessons);
         } else {
           // 初期レッスンの保存
           console.log('デフォルトのレッスンデータを使用します');
@@ -159,7 +206,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
           localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
           
           // APIにも保存
-          saveLessonsToAPI(DEFAULT_LESSONS);
+          await saveLessonsToAPI(DEFAULT_LESSONS);
         }
       } catch (error) {
         console.error('レッスンデータの読み込みエラー:', error);
@@ -167,6 +214,13 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
         // エラー時はローカルのデフォルトレッスンを使用
         setLessons(DEFAULT_LESSONS);
         localStorage.setItem('lessons', JSON.stringify(DEFAULT_LESSONS));
+        
+        try {
+          // エラー後もAPIへの保存を試みる
+          await saveLessonsToAPI(DEFAULT_LESSONS);
+        } catch (e) {
+          console.error('エラー後のAPI保存も失敗:', e);
+        }
       }
     };
 
@@ -176,6 +230,8 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
   // APIにレッスンデータを保存する関数
   const saveLessonsToAPI = async (lessonsData: Lesson[]) => {
     try {
+      console.log(`${lessonsData.length}件のレッスンデータをAPIに保存します`);
+      
       const response = await fetch('/api/lessons', {
         method: 'POST',
         headers: {
@@ -184,13 +240,19 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
         body: JSON.stringify({ lessons: lessonsData }),
       });
 
+      const responseData = await response.json();
+      console.log('API保存レスポンス:', responseData);
+
       if (!response.ok) {
-        console.error('APIへのレッスンデータ保存に失敗しました');
+        console.error('APIへのレッスンデータ保存に失敗しました:', responseData);
+        return false;
       } else {
         console.log('APIにレッスンデータを保存しました');
+        return true;
       }
     } catch (error) {
       console.error('APIへのレッスンデータ保存エラー:', error);
+      return false;
     }
   };
 
@@ -412,131 +474,99 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
 
   // レッスン保存
   const handleSaveLesson = () => {
-    if (!formData.title.trim()) {
-      alert('タイトルは必須です');
-      return;
-    }
-
-    let dialogueTurns: DialogueTurn[] = [];
-    
-    // 構造化されたダイアログデータを使用（優先）
-    if (formData.dialogueTurns.length > 0) {
-      dialogueTurns = formData.dialogueTurns.map((turn, index) => ({
-        role: turn.role,
-        text: turn.text,
-        translation: turn.translation,
-        turnNumber: index + 1 // ターン番号を再設定して確実に連番にする
-      }));
-    } 
-    // 後方互換性のためにテキストからの解析も残す
-    else if (formData.dialogueText.trim()) {
-      try {
-        // 各行を解析
-        const lines = formData.dialogueText.split('\n').filter(line => line.trim());
-        dialogueTurns = lines.map((line, index) => {
-          // パターン: role: "text" - "translation"
-          const roleMatch = line.match(/^(staff|customer):/i);
-          if (!roleMatch) throw new Error(`行 ${index + 1} の役割が無効です。'staff:' または 'customer:' で始める必要があります`);
-          
-          const role = roleMatch[1].toLowerCase() as 'staff' | 'customer';
-          
-          // テキストと翻訳を抽出
-          const textMatch = line.match(/"([^"]+)"\s*-\s*"([^"]+)"/);
-          if (!textMatch) throw new Error(`行 ${index + 1} のフォーマットが無効です。"テキスト" - "翻訳" の形式が必要です`);
-          
-          const text = textMatch[1];
-          const translation = textMatch[2];
-          
-          return {
-            role,
-            text,
-            translation,
-            turnNumber: index + 1
-          };
-        });
-      } catch (error) {
-        alert(`ダイアログの解析エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
-        return;
-      }
-    }
-
-    // キーフレーズの検証
-    if (!formData.keyPhraseText.trim() || !formData.keyPhraseTranslation.trim()) {
-      alert('キーフレーズとその翻訳は必須です');
-      return;
-    }
-
-    const keyPhrase: Phrase = {
-      text: formData.keyPhraseText,
-      translation: formData.keyPhraseTranslation
-    };
-
-    // 目標の解析
-    const goals: Goal[] = formData.goalsText
-      .split('\n')
-      .filter(line => line.trim())
-      .map(text => ({ text: text.trim() }));
-
-    const tagsArray = formData.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag);
-
+    // フォームデータからレッスンオブジェクトを作成
     const newLesson: Lesson = {
-      id: isEditing && currentLesson ? currentLesson.id : `lesson-${Date.now()}`,
+      id: formData.id,
       title: formData.title,
       description: formData.description,
-      pdfUrl: formData.pdfUrl || undefined,
-      systemPrompt: formData.systemPrompt || undefined,
+      pdfUrl: formData.pdfUrl,
+      systemPrompt: formData.systemPrompt,
       level: formData.level,
-      tags: tagsArray,
+      tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
       createdAt: isEditing && currentLesson ? currentLesson.createdAt : Date.now(),
       updatedAt: Date.now(),
-      keyPhrase,
-      dialogueTurns,
-      goals: goals.length > 0 ? goals : undefined,
-      headerTitle: formData.headerTitle.trim() || undefined,
-      startButtonText: formData.startButtonText.trim() || undefined,
-      audioGenerated: false
+      audioGenerated: isEditing && currentLesson ? currentLesson.audioGenerated : false,
+      headerTitle: formData.headerTitle,
+      startButtonText: formData.startButtonText
     };
 
+    // キーフレーズの設定
+    if (formData.keyPhraseText && formData.keyPhraseTranslation) {
+      newLesson.keyPhrase = {
+        text: formData.keyPhraseText,
+        translation: formData.keyPhraseTranslation
+      };
+    }
+
+    // ダイアログターンの設定
+    if (formData.dialogueTurns && formData.dialogueTurns.length > 0) {
+      newLesson.dialogueTurns = formData.dialogueTurns;
+    }
+    
+    // ゴールの設定
+    if (formData.goalsText) {
+      newLesson.goals = formData.goalsText.split('\n')
+        .map(goal => goal.trim())
+        .filter(goal => goal)
+        .map(goal => ({ text: goal }));
+    }
+
     let updatedLessons: Lesson[];
-    if (isAdding) {
-      updatedLessons = [...lessons, newLesson];
-    } else {
+
+    if (isEditing) {
+      // 既存のレッスンを更新
       updatedLessons = lessons.map(lesson => 
         lesson.id === newLesson.id ? newLesson : lesson
       );
+      setIsEditing(false);
+    } else {
+      // 新しいレッスンを追加
+      updatedLessons = [...lessons, newLesson];
+      setIsAdding(false);
     }
 
+    // 状態とローカルストレージを更新
     setLessons(updatedLessons);
     localStorage.setItem('lessons', JSON.stringify(updatedLessons));
     
-    // APIにも保存
-    saveLessonsToAPI(updatedLessons);
+    // APIに保存
+    saveLessonsToAPI(updatedLessons).then(success => {
+      if (success) {
+        console.log('レッスンがAPIに保存されました');
+      } else {
+        console.warn('レッスンのAPI保存に失敗しましたが、ローカルには保存されています');
+      }
+    });
 
-    setIsAdding(false);
-    setIsEditing(false);
-    setCurrentLesson(newLesson);
+    // フォームをリセット
+    resetForm();
+
+    // 親コンポーネントに選択中のレッスンを通知
     onSelectLesson(newLesson);
   };
 
   // レッスン削除
   const handleDeleteLesson = (id: string) => {
-    const filteredLessons = lessons.filter(lesson => lesson.id !== id);
-    setLessons(filteredLessons);
-    localStorage.setItem('lessons', JSON.stringify(filteredLessons));
-    
-    // APIにも保存
-    saveLessonsToAPI(filteredLessons);
-    
-    // 現在選択されているレッスンが削除対象の場合は、別のレッスンを選択
-    if (currentLesson && currentLesson.id === id) {
-      if (filteredLessons.length > 0) {
-        setCurrentLesson(filteredLessons[0]);
-        onSelectLesson(filteredLessons[0]);
-      } else {
-        setCurrentLesson(null);
+    if (window.confirm('このレッスンを削除してもよろしいですか？')) {
+      const updatedLessons = lessons.filter(lesson => lesson.id !== id);
+      
+      // 状態とローカルストレージを更新
+      setLessons(updatedLessons);
+      localStorage.setItem('lessons', JSON.stringify(updatedLessons));
+      
+      // APIにも反映
+      saveLessonsToAPI(updatedLessons).then(success => {
+        if (success) {
+          console.log('レッスン削除がAPIに反映されました');
+        } else {
+          console.warn('レッスン削除のAPI反映に失敗しましたが、ローカルには反映されています');
+        }
+      });
+
+      // 編集中だった場合はリセット
+      if (isEditing && currentLesson?.id === id) {
+        setIsEditing(false);
+        resetForm();
       }
     }
   };
