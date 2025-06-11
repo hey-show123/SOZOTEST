@@ -326,12 +326,13 @@ export default function InteractiveDialoguePractice({
         {/* アバター表示エリア */}
         <div className="flex justify-center mb-6">
           <div className="relative">
-            <div className={`relative w-32 h-32 sm:w-40 sm:h-40 overflow-hidden rounded-full ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
+            <div className="relative">
               <Image
                 src={avatarImages[currentAvatarIndex]}
                 alt="Customer Avatar"
-                fill
-                className="object-cover"
+                width={200}
+                height={200}
+                className={`${isAvatarSpeaking ? 'animate-pulse' : ''}`}
               />
             </div>
             

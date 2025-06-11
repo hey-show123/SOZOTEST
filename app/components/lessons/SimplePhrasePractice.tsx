@@ -170,13 +170,14 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         
         {/* アバターとアシスタント名 */}
         <div className="flex items-center mb-6">
-          <div className={`relative w-24 h-24 rounded-full overflow-hidden mr-4 flex-shrink-0 ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
+          <div className="relative mr-4 flex-shrink-0">
             {/* アニメーションするアバター画像 */}
             <Image 
               src={avatarImages[currentAvatarIndex]}
               alt="SOZO Assistant"
-              fill
-              className="object-cover"
+              width={96}
+              height={96}
+              className={`${isAvatarSpeaking ? 'animate-pulse' : ''}`}
             />
             
             {/* 話している状態を示すインジケーター */}
