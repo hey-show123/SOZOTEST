@@ -81,8 +81,8 @@ export default function InteractiveDialoguePractice({
   
   // アバター画像の配列
   const avatarImages = [
-    '/images/avatar/robot1.png',
-    '/images/avatar/robot2.png'
+    '/images/avatar/IMG_5911.PNG',
+    '/images/avatar/被写体.png'
   ];
 
   // アバター画像を切り替えるための効果
