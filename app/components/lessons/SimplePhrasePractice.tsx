@@ -141,6 +141,37 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         />
       </div>
       
+      {/* アバターとアシスタント名 */}
+      <div className="relative z-10 mb-6 flex flex-col items-center">
+        <div className={`relative w-24 h-24 rounded-full overflow-hidden mb-3 ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
+          {/* アニメーションするアバター画像 */}
+          <Image 
+            src={avatarImages[currentAvatarIndex]}
+            alt="SOZO Assistant"
+            fill
+            className="object-cover"
+          />
+          
+          {/* 話している状態を示すインジケーター */}
+          {isAvatarSpeaking && (
+            <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+          )}
+        </div>
+        <div className="text-center bg-white/80 backdrop-blur-sm px-4 py-2 rounded-lg">
+          <h3 className="text-xl font-bold">SOZO アシスタント</h3>
+          <p className="text-lg text-gray-700">
+            {avatarFeedback || `もうちょっと！あと${2 - successCount}回言えたらバッチリ！発音が合ってたら、次に進めるよ〜 がんばって！`}
+          </p>
+          
+          {/* 会話風のアニメーション吹き出し */}
+          {isAvatarSpeaking && (
+            <div className="absolute -right-2 -top-6 bg-blue-100 px-2 py-1 rounded text-xs text-blue-800 animate-bounce">
+              再生中...
+            </div>
+          )}
+        </div>
+      </div>
+      
       <div className="w-full bg-white/95 backdrop-blur-sm rounded-3xl shadow-lg p-6 relative z-10">
         {/* キーフレーズの吹き出し */}
         <div className="relative mb-10">
@@ -165,38 +196,6 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
             
             {/* 吹き出しの三角形部分 */}
             <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[20px] border-yellow-300"></div>
-          </div>
-        </div>
-        
-        {/* アバターとアシスタント名 */}
-        <div className="flex items-center mb-6">
-          <div className="relative mr-4 flex-shrink-0">
-            {/* アニメーションするアバター画像 */}
-            <Image 
-              src={avatarImages[currentAvatarIndex]}
-              alt="SOZO Assistant"
-              width={96}
-              height={96}
-              className={`${isAvatarSpeaking ? 'animate-pulse' : ''}`}
-            />
-            
-            {/* 話している状態を示すインジケーター */}
-            {isAvatarSpeaking && (
-              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-            )}
-          </div>
-          <div className="relative">
-            <h3 className="text-xl font-bold">SOZO アシスタント</h3>
-            <p className="text-lg text-gray-700">
-              {avatarFeedback || `もうちょっと！あと${2 - successCount}回言えたらバッチリ！発音が合ってたら、次に進めるよ〜 がんばって！`}
-            </p>
-            
-            {/* 会話風のアニメーション吹き出し */}
-            {isAvatarSpeaking && (
-              <div className="absolute -right-2 -top-6 bg-blue-100 px-2 py-1 rounded text-xs text-blue-800 animate-bounce">
-                再生中...
-              </div>
-            )}
           </div>
         </div>
         

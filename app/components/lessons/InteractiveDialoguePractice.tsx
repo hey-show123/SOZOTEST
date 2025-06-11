@@ -314,6 +314,33 @@ export default function InteractiveDialoguePractice({
         />
       </div>
       
+      {/* アバター表示エリア */}
+      <div className="relative z-10 mb-6 mt-4">
+        <div className={`relative w-32 h-32 sm:w-40 sm:h-40 overflow-hidden rounded-full mx-auto ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
+          <Image
+            src={avatarImages[currentAvatarIndex]}
+            alt="Customer Avatar"
+            fill
+            className="object-cover"
+          />
+        </div>
+        
+        {/* 音声再生中の表示 */}
+        {isAvatarSpeaking && (
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
+            話し中...
+          </div>
+        )}
+        
+        {/* 会話吹き出し（最新の客のセリフ） */}
+        {currentLine && currentLine.role === 'customer' && isAvatarSpeaking && (
+          <div className="absolute -top-2 right-0 transform translate-x-full max-w-[200px] bg-blue-100 p-3 rounded-lg border border-blue-200 text-sm">
+            <p className="font-medium">{currentLine.text}</p>
+            <div className="absolute -left-2 top-4 w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-r-blue-100 border-b-[8px] border-b-transparent"></div>
+          </div>
+        )}
+      </div>
+      
       <div className="w-full max-w-xl bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-4 sm:p-6 relative z-10">
         {/* レッスンタイトル */}
         <div className="text-center mb-3 sm:mb-4">
@@ -321,36 +348,6 @@ export default function InteractiveDialoguePractice({
           <p className="text-base sm:text-lg text-gray-700 font-medium">
             あなたはスタッフ役です。お客さんとやりとりしてみよう！
           </p>
-        </div>
-
-        {/* アバター表示エリア */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            <div className="relative">
-              <Image
-                src={avatarImages[currentAvatarIndex]}
-                alt="Customer Avatar"
-                width={200}
-                height={200}
-                className={`${isAvatarSpeaking ? 'animate-pulse' : ''}`}
-              />
-            </div>
-            
-            {/* 音声再生中の表示 */}
-            {isAvatarSpeaking && (
-              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs px-3 py-1 rounded-full">
-                話し中...
-              </div>
-            )}
-            
-            {/* 会話吹き出し（最新の客のセリフ） */}
-            {currentLine && currentLine.role === 'customer' && isAvatarSpeaking && (
-              <div className="absolute -top-2 right-0 transform translate-x-full max-w-[200px] bg-blue-100 p-3 rounded-lg border border-blue-200 text-sm">
-                <p className="font-medium">{currentLine.text}</p>
-                <div className="absolute -left-2 top-4 w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-r-blue-100 border-b-[8px] border-b-transparent"></div>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* 会話履歴エリア */}
