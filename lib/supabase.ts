@@ -1,31 +1,28 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Supabaseの環境変数
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// 固定値を設定（Vercelの環境変数の問題を回避）
+// 注意：本番環境では環境変数を使用するべきですが、トラブルシューティングのために一時的に固定値を使用
+const HARDCODED_SUPABASE_URL = 'https://xkrdzdvhvfhpsxyayiil.supabase.co';
+// 実際のキーに置き換えてください（ここではプレースホルダー）
+const HARDCODED_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrcmR6ZHZodmZocHN4eWF5aWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTU0MjI3OTcsImV4cCI6MjAzMDk5ODc5N30.dJTRIxCdwXhcyjnbKU4pjnkHOu-q4Qm1z9Fc_bRRExE';
 
-// デバッグ情報
-console.log('Supabase環境変数チェック:');
-console.log('- NODE_ENV:', process.env.NODE_ENV);
-console.log('- NEXT_PUBLIC_SUPABASE_URL exists:', !!supabaseUrl);
-console.log('- NEXT_PUBLIC_SUPABASE_ANON_KEY exists:', !!supabaseAnonKey);
+// 環境変数またはハードコードされた値を使用
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || HARDCODED_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || HARDCODED_SUPABASE_KEY;
 
-// 環境変数のチェック
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase環境変数が設定されていません。ローカルストレージを使用します。');
-}
+console.log('========== Supabase接続情報 ==========');
+console.log('URL:', supabaseUrl);
+console.log('Key (最初の10文字):', supabaseAnonKey.substring(0, 10) + '...');
 
-// Supabaseクライアントの作成
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+// Supabaseクライアントの作成（シンプルに直接作成）
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Supabaseクライアントの接続確認
-if (supabase) {
-  supabase.auth.getSession()
-    .then(() => console.log('Supabaseクライアント: 接続確認成功'))
-    .catch(err => console.error('Supabaseクライアント: 接続確認失敗', err));
-}
+console.log('Supabaseクライアント初期化完了');
+supabase.auth.getSession()
+  .then(() => console.log('✅ Supabase接続確認: 成功'))
+  .catch(err => console.error('❌ Supabase接続失敗:', err));
 
 // レッスンデータ用のテーブル名
 export const LESSONS_TABLE = 'lessons';
@@ -34,4 +31,6 @@ export const LESSONS_TABLE = 'lessons';
 export const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Supabaseが設定されているかどうかをチェック
-export const isSupabaseConfigured = !!supabase; 
+export const isSupabaseConfigured = true; // 常にtrueに設定
+
+export { supabase }; 

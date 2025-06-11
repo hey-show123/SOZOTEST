@@ -7,6 +7,35 @@ import { ModelProvider } from './context/ModelContext';
 import { useEffect } from 'react';
 
 function HomePage() {
+  // APIからレッスンデータを取得してローカルストレージに同期
+  useEffect(() => {
+    const syncLessonsData = async () => {
+      try {
+        console.log('レッスンデータの同期を開始します...');
+        const response = await fetch('/api/lessons');
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.lessons && Array.isArray(data.lessons)) {
+            console.log(`APIから${data.lessons.length}件のレッスンデータを取得しました`);
+            
+            // ローカルストレージに保存
+            localStorage.setItem('lessons', JSON.stringify(data.lessons));
+            console.log('レッスンデータをローカルストレージに保存しました');
+          } else {
+            console.warn('APIからのレッスンデータが無効です:', data);
+          }
+        } else {
+          console.error('APIからのレッスンデータ取得に失敗しました:', response.statusText);
+        }
+      } catch (error) {
+        console.error('レッスンデータの同期エラー:', error);
+      }
+    };
+
+    syncLessonsData();
+  }, []);
+
   // ページロード時にカスタムイベントを発生させて、レッスンを自動開始
   useEffect(() => {
     // DOM要素が完全に読み込まれてから実行

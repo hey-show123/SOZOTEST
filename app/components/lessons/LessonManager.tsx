@@ -232,6 +232,40 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     try {
       console.log(`${lessonsData.length}件のレッスンデータをAPIに保存します`);
       
+      // 念のためローカルストレージに保存（フォールバック）
+      localStorage.setItem('lessons', JSON.stringify(lessonsData));
+      
+      // データが多すぎる場合は分割して送信（APIの制限対策）
+      const chunkSize = 50;
+      if (lessonsData.length > chunkSize) {
+        console.log(`レッスンデータが多いため、${chunkSize}件ずつに分けて送信します`);
+        let allSuccess = true;
+        
+        // レッスンを50件ずつに分割
+        for (let i = 0; i < lessonsData.length; i += chunkSize) {
+          const chunk = lessonsData.slice(i, i + chunkSize);
+          console.log(`チャンク ${i/chunkSize + 1}/${Math.ceil(lessonsData.length/chunkSize)} (${chunk.length}件) を送信中...`);
+          
+          const response = await fetch('/api/lessons', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ lessons: chunk }),
+          });
+          
+          const responseData = await response.json();
+          
+          if (!response.ok || !responseData.success) {
+            console.error(`チャンク ${i/chunkSize + 1} の保存に失敗:`, responseData);
+            allSuccess = false;
+          }
+        }
+        
+        return allSuccess;
+      }
+      
+      // 通常の送信処理
       const response = await fetch('/api/lessons', {
         method: 'POST',
         headers: {
@@ -243,8 +277,14 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       const responseData = await response.json();
       console.log('API保存レスポンス:', responseData);
 
-      if (!response.ok) {
+      if (!response.ok || !responseData.success) {
         console.error('APIへのレッスンデータ保存に失敗しました:', responseData);
+        
+        // エラーメッセージを表示
+        window.alert(`レッスンデータのSupabaseへの保存に失敗しました。
+エラー: ${responseData.error || '不明なエラー'}
+ローカルストレージには保存されています。`);
+        
         return false;
       } else {
         console.log('APIにレッスンデータを保存しました');
@@ -252,6 +292,12 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       }
     } catch (error) {
       console.error('APIへのレッスンデータ保存エラー:', error);
+      
+      // エラーメッセージを表示
+      window.alert(`レッスンデータのAPI保存中にエラーが発生しました。
+エラー: ${error instanceof Error ? error.message : String(error)}
+ローカルストレージには保存されています。`);
+      
       return false;
     }
   };
@@ -473,7 +519,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
   };
 
   // レッスン保存
-  const handleSaveLesson = () => {
+  const handleSaveLesson = async () => {
     // フォームデータからレッスンオブジェクトを作成
     const newLesson: Lesson = {
       id: formData.id,
@@ -529,14 +575,54 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     setLessons(updatedLessons);
     localStorage.setItem('lessons', JSON.stringify(updatedLessons));
     
+    // 保存中のステータス表示
+    const saveStatusElement = document.createElement('div');
+    saveStatusElement.style.position = 'fixed';
+    saveStatusElement.style.top = '20px';
+    saveStatusElement.style.right = '20px';
+    saveStatusElement.style.backgroundColor = '#f0f0f0';
+    saveStatusElement.style.border = '1px solid #ccc';
+    saveStatusElement.style.padding = '10px 20px';
+    saveStatusElement.style.borderRadius = '4px';
+    saveStatusElement.style.zIndex = '1000';
+    saveStatusElement.textContent = 'レッスンデータをSupabaseに保存中...';
+    document.body.appendChild(saveStatusElement);
+    
     // APIに保存
-    saveLessonsToAPI(updatedLessons).then(success => {
+    try {
+      const success = await saveLessonsToAPI(updatedLessons);
+      
       if (success) {
         console.log('レッスンがAPIに保存されました');
+        saveStatusElement.textContent = '保存成功: レッスンがSupabaseに保存されました';
+        saveStatusElement.style.backgroundColor = '#d4edda';
+        saveStatusElement.style.border = '1px solid #c3e6cb';
       } else {
         console.warn('レッスンのAPI保存に失敗しましたが、ローカルには保存されています');
+        saveStatusElement.textContent = '保存エラー: Supabaseへの保存に失敗しましたが、ローカルには保存されています';
+        saveStatusElement.style.backgroundColor = '#f8d7da';
+        saveStatusElement.style.border = '1px solid #f5c6cb';
       }
-    });
+      
+      // 3秒後に通知を消す
+      setTimeout(() => {
+        if (document.body.contains(saveStatusElement)) {
+          document.body.removeChild(saveStatusElement);
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('API保存エラー:', error);
+      saveStatusElement.textContent = `保存エラー: ${error instanceof Error ? error.message : '不明なエラー'}`;
+      saveStatusElement.style.backgroundColor = '#f8d7da';
+      saveStatusElement.style.border = '1px solid #f5c6cb';
+      
+      // 5秒後に通知を消す
+      setTimeout(() => {
+        if (document.body.contains(saveStatusElement)) {
+          document.body.removeChild(saveStatusElement);
+        }
+      }, 5000);
+    }
 
     // フォームをリセット
     resetForm();
@@ -546,7 +632,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
   };
 
   // レッスン削除
-  const handleDeleteLesson = (id: string) => {
+  const handleDeleteLesson = async (id: string) => {
     if (window.confirm('このレッスンを削除してもよろしいですか？')) {
       const updatedLessons = lessons.filter(lesson => lesson.id !== id);
       
@@ -554,14 +640,54 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       setLessons(updatedLessons);
       localStorage.setItem('lessons', JSON.stringify(updatedLessons));
       
+      // 削除中のステータス表示
+      const deleteStatusElement = document.createElement('div');
+      deleteStatusElement.style.position = 'fixed';
+      deleteStatusElement.style.top = '20px';
+      deleteStatusElement.style.right = '20px';
+      deleteStatusElement.style.backgroundColor = '#f0f0f0';
+      deleteStatusElement.style.border = '1px solid #ccc';
+      deleteStatusElement.style.padding = '10px 20px';
+      deleteStatusElement.style.borderRadius = '4px';
+      deleteStatusElement.style.zIndex = '1000';
+      deleteStatusElement.textContent = 'レッスン削除をSupabaseに反映中...';
+      document.body.appendChild(deleteStatusElement);
+      
       // APIにも反映
-      saveLessonsToAPI(updatedLessons).then(success => {
+      try {
+        const success = await saveLessonsToAPI(updatedLessons);
+        
         if (success) {
           console.log('レッスン削除がAPIに反映されました');
+          deleteStatusElement.textContent = '削除成功: レッスン削除がSupabaseに反映されました';
+          deleteStatusElement.style.backgroundColor = '#d4edda';
+          deleteStatusElement.style.border = '1px solid #c3e6cb';
         } else {
           console.warn('レッスン削除のAPI反映に失敗しましたが、ローカルには反映されています');
+          deleteStatusElement.textContent = '削除エラー: Supabaseへの反映に失敗しましたが、ローカルには削除されています';
+          deleteStatusElement.style.backgroundColor = '#f8d7da';
+          deleteStatusElement.style.border = '1px solid #f5c6cb';
         }
-      });
+        
+        // 3秒後に通知を消す
+        setTimeout(() => {
+          if (document.body.contains(deleteStatusElement)) {
+            document.body.removeChild(deleteStatusElement);
+          }
+        }, 3000);
+      } catch (error) {
+        console.error('API削除反映エラー:', error);
+        deleteStatusElement.textContent = `削除エラー: ${error instanceof Error ? error.message : '不明なエラー'}`;
+        deleteStatusElement.style.backgroundColor = '#f8d7da';
+        deleteStatusElement.style.border = '1px solid #f5c6cb';
+        
+        // 5秒後に通知を消す
+        setTimeout(() => {
+          if (document.body.contains(deleteStatusElement)) {
+            document.body.removeChild(deleteStatusElement);
+          }
+        }, 5000);
+      }
 
       // 編集中だった場合はリセット
       if (isEditing && currentLesson?.id === id) {
@@ -864,14 +990,67 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     }
   };
 
+  // Supabaseにレッスンを明示的にエクスポートする関数
+  const handleExportToSupabase = async () => {
+    if (lessons.length === 0) {
+      window.alert('エクスポートするレッスンがありません。');
+      return;
+    }
+    
+    if (!window.confirm(`${lessons.length}件のレッスンをSupabaseにエクスポートしますか？\n既存のデータは上書きされます。`)) {
+      return;
+    }
+    
+    // エクスポート中のステータス表示
+    const exportStatusElement = document.createElement('div');
+    exportStatusElement.style.position = 'fixed';
+    exportStatusElement.style.top = '20px';
+    exportStatusElement.style.right = '20px';
+    exportStatusElement.style.backgroundColor = '#f0f0f0';
+    exportStatusElement.style.border = '1px solid #ccc';
+    exportStatusElement.style.padding = '10px 20px';
+    exportStatusElement.style.borderRadius = '4px';
+    exportStatusElement.style.zIndex = '1000';
+    exportStatusElement.textContent = `${lessons.length}件のレッスンデータをSupabaseにエクスポート中...`;
+    document.body.appendChild(exportStatusElement);
+    
+    try {
+      const success = await saveLessonsToAPI(lessons);
+      
+      if (success) {
+        exportStatusElement.textContent = `エクスポート成功: ${lessons.length}件のレッスンがSupabaseに保存されました`;
+        exportStatusElement.style.backgroundColor = '#d4edda';
+        exportStatusElement.style.border = '1px solid #c3e6cb';
+      } else {
+        exportStatusElement.textContent = 'エクスポートエラー: Supabaseへの保存に失敗しました';
+        exportStatusElement.style.backgroundColor = '#f8d7da';
+        exportStatusElement.style.border = '1px solid #f5c6cb';
+      }
+    } catch (error) {
+      console.error('Supabaseエクスポートエラー:', error);
+      exportStatusElement.textContent = `エクスポートエラー: ${error instanceof Error ? error.message : '不明なエラー'}`;
+      exportStatusElement.style.backgroundColor = '#f8d7da';
+      exportStatusElement.style.border = '1px solid #f5c6cb';
+    }
+    
+    // 5秒後に通知を消す
+    setTimeout(() => {
+      if (document.body.contains(exportStatusElement)) {
+        document.body.removeChild(exportStatusElement);
+      }
+    }, 5000);
+  };
+
   return (
     <div className="w-full">
       {(isAdding || isEditing) ? (
+        // レッスン編集フォーム（変更なし）
         <div className="bg-white rounded-lg shadow-md p-4">
           <h2 className="text-xl font-semibold mb-4">
             {isAdding ? 'レッスンを追加' : 'レッスンを編集'}
           </h2>
           
+          {/* 既存のフォーム部分（変更なし） */}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">タイトル*</label>
@@ -1217,8 +1396,9 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
+        // レッスン一覧表示
+        <>
+          <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">レッスン一覧</h2>
             <div className="flex space-x-2">
               <button
@@ -1230,11 +1410,22 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                   <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                   <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
                 </svg>
-                エクスポート
+                JSONエクスポート
+              </button>
+              <button
+                onClick={handleExportToSupabase}
+                className="px-3 py-1 bg-purple-500 rounded hover:bg-purple-600 text-white text-sm flex items-center"
+                title="レッスンデータをSupabaseに保存します"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+                Supabaseに保存
               </button>
               <button
                 onClick={handleOpenImportDialog}
-                className="px-3 py-1 bg-purple-500 rounded hover:bg-purple-600 text-white text-sm flex items-center"
+                className="px-3 py-1 bg-orange-500 rounded hover:bg-orange-600 text-white text-sm flex items-center"
                 title="JSONファイルからレッスンデータをインポート"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
@@ -1243,15 +1434,15 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                 </svg>
                 インポート
               </button>
-            <button
-              onClick={handleStartAdd}
-              className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white text-sm flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
-                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-              </svg>
-              新規追加
-            </button>
+              <button
+                onClick={handleStartAdd}
+                className="px-3 py-1 bg-green-500 rounded hover:bg-green-600 text-white text-sm flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="mr-1" viewBox="0 0 16 16">
+                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                </svg>
+                新規追加
+              </button>
               
               {/* 非表示のファイル入力フィールド */}
               <input
@@ -1385,7 +1576,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
               )}
             </ul>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -24,40 +24,156 @@ export default function LessonPage({ params }: LessonPageProps) {
 
   // レッスンデータをローカルストレージから取得
   useEffect(() => {
-    try {
-      const savedLessons = localStorage.getItem('lessons');
-      if (savedLessons) {
-        const lessons = JSON.parse(savedLessons) as Lesson[];
-        const foundLesson = lessons.find(l => l.id === lessonId);
+    const fetchLesson = async () => {
+      try {
+        console.log(`レッスンID「${lessonId}」の取得を開始します...`);
+        setIsLoading(true);
         
+        // レッスンの取得を複数の方法で試みる
+        let foundLesson = null;
+        
+        // 1. Supabaseから直接取得（最も信頼性が高い方法）
+        try {
+          console.log('Supabaseから直接レッスンデータを取得しています...');
+          // Supabaseクライアントをインポート
+          const { supabase } = await import('../../lib/supabase');
+          
+          // Supabaseからレッスンデータを取得
+          const { data, error } = await supabase
+            .from('lessons')
+            .select('*')
+            .eq('id', lessonId)
+            .single();
+          
+          if (error) {
+            console.error('Supabaseからのデータ取得エラー:', error);
+          } else if (data) {
+            console.log('Supabaseからレッスンデータを取得しました:', data);
+            foundLesson = data;
+          }
+        } catch (supabaseError) {
+          console.error('Supabase直接アクセスエラー:', supabaseError);
+        }
+        
+        // 2. APIから取得（Supabaseから取得できない場合）
+        if (!foundLesson) {
+          try {
+            console.log('APIからレッスンデータを取得しています...');
+            const response = await fetch(`/api/lesson/${lessonId}`);
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.lesson) {
+                console.log('APIからレッスンデータを取得しました:', data.lesson);
+                foundLesson = data.lesson;
+              }
+            } else {
+              console.error('APIからのデータ取得に失敗:', response.status);
+            }
+          } catch (apiError) {
+            console.error('APIアクセスエラー:', apiError);
+          }
+        }
+        
+        // 3. 全レッスンAPIから取得
+        if (!foundLesson) {
+          try {
+            console.log('全レッスンAPIからデータを取得しています...');
+            const response = await fetch('/api/lessons');
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.lessons && Array.isArray(data.lessons)) {
+                const matchingLesson = data.lessons.find((l: Lesson) => l.id === lessonId);
+                if (matchingLesson) {
+                  console.log('全レッスンAPIからデータを取得しました:', matchingLesson);
+                  foundLesson = matchingLesson;
+                }
+              }
+            }
+          } catch (allLessonsError) {
+            console.error('全レッスンAPI取得エラー:', allLessonsError);
+          }
+        }
+        
+        // 4. ローカルストレージから取得
+        if (!foundLesson) {
+          try {
+            console.log('ローカルストレージからデータ取得を試みます...');
+            const savedLessons = localStorage.getItem('lessons');
+            if (savedLessons) {
+              const lessons = JSON.parse(savedLessons);
+              const matchingLesson = lessons.find((l: Lesson) => l.id === lessonId);
+              if (matchingLesson) {
+                console.log('ローカルストレージからデータを取得しました:', matchingLesson);
+                foundLesson = matchingLesson;
+              }
+            }
+          } catch (localStorageError) {
+            console.error('ローカルストレージエラー:', localStorageError);
+          }
+        }
+        
+        // 5. デフォルトレッスンから取得
+        if (!foundLesson) {
+          try {
+            console.log('デフォルトレッスンからデータ取得を試みます...');
+            const { DEFAULT_LESSONS } = await import('../../constants/defaultLessons');
+            const matchingLesson = DEFAULT_LESSONS.find(l => l.id === lessonId);
+            if (matchingLesson) {
+              console.log('デフォルトレッスンからデータを取得しました:', matchingLesson);
+              foundLesson = matchingLesson;
+            }
+          } catch (defaultLessonsError) {
+            console.error('デフォルトレッスン取得エラー:', defaultLessonsError);
+          }
+        }
+
+        // データが見つかったらレッスンを設定
         if (foundLesson) {
+          console.log('最終的に取得したレッスンデータ:', foundLesson);
           setLesson(foundLesson);
           
-          // レッスンが見つかったらPDFのURLをセッションストレージに保存
-          // このデータは別のコンポーネントで使用されます
+          // セッションストレージに保存
           if (foundLesson.pdfUrl) {
             sessionStorage.setItem('currentLessonPdf', foundLesson.pdfUrl);
           }
-          
-          // システムプロンプトがあれば保存
           if (foundLesson.systemPrompt) {
             sessionStorage.setItem('currentLessonPrompt', foundLesson.systemPrompt);
           }
-          
-          // レッスンIDを保存
           sessionStorage.setItem('currentLessonId', foundLesson.id);
+          
+          // ローカルストレージにも保存（キャッシュとして）
+          try {
+            const savedLessons = localStorage.getItem('lessons');
+            let lessons = savedLessons ? JSON.parse(savedLessons) : [];
+            
+            // 既存のレッスンを更新または新しいレッスンを追加
+            const existingIndex = lessons.findIndex((l: Lesson) => l.id === foundLesson.id);
+            if (existingIndex >= 0) {
+              lessons[existingIndex] = foundLesson;
+            } else {
+              lessons.push(foundLesson);
+            }
+            
+            localStorage.setItem('lessons', JSON.stringify(lessons));
+            console.log('レッスンデータをローカルストレージに保存しました');
+          } catch (saveError) {
+            console.error('ローカルストレージ保存エラー:', saveError);
+          }
         } else {
+          console.error(`レッスンID「${lessonId}」が見つかりませんでした`);
           setError(`レッスンID「${lessonId}」が見つかりません。`);
         }
-      } else {
-        setError('レッスンデータがありません。');
+      } catch (error) {
+        console.error('レッスンデータ取得中のエラー:', error);
+        setError('レッスンデータの読み込み中にエラーが発生しました。');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      setError('レッスンデータの読み込み中にエラーが発生しました。');
-      console.error('レッスンデータの読み込みエラー:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    fetchLesson();
   }, [lessonId]);
 
   // ページロード時にカスタムイベントを発生させて、AIレッスンモードを自動選択
