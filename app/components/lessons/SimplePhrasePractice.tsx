@@ -37,8 +37,8 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
 
   // アバター画像の配列
   const avatarImages = [
-    '/images/avatar/Gemini_Generated_Image_no9r19no9r19no9r.png',
-    '/images/avatar/Gemini_Generated_Image_wbi9nhwbi9nhwbi9.png'
+    '/images/avatar/robot1.png',
+    '/images/avatar/robot2.png'
   ];
 
   // アバター画像を切り替えるための効果
@@ -143,13 +143,13 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
       
       {/* アバターとアシスタント名 */}
       <div className="relative z-10 mb-6 flex flex-col items-center">
-        <div className={`relative w-24 h-24 rounded-full overflow-hidden mb-3 ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
+        <div className={`relative w-36 h-36 mb-3 ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
           {/* アニメーションするアバター画像 */}
           <Image 
             src={avatarImages[currentAvatarIndex]}
             alt="SOZO Assistant"
             fill
-            className="object-cover"
+            className="object-contain"
           />
           
           {/* 話している状態を示すインジケーター */}
