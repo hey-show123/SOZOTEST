@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAdmin } from '../../context/AdminContext';
+import { useAdmin } from '@/app/context/AdminContext';
 import Link from 'next/link';
 import VoiceSelector from '../../components/VoiceSelector';
-import { VoiceProvider } from '../../context/VoiceContext';
+import { VoiceProvider } from '@/app/context/VoiceContext';
 import ModelSelector from '../../components/ModelSelector';
-import { ModelProvider } from '../../context/ModelContext';
+import { ModelProvider } from '@/app/context/ModelContext';
 
 // 音声読み上げスピード設定コンポーネント
 function SpeechRateSelector() {

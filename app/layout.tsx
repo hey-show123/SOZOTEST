@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AdminProvider } from './context/AdminContext';
+import { AdminProvider } from '@/app/context/AdminContext';
 // react-pdfのCSSインポートはPDFビューアーを使用するコンポーネントに直接移動します
 
 const geistSans = Geist({
