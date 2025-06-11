@@ -81,8 +81,8 @@ export default function InteractiveDialoguePractice({
   
   // アバター画像の配列
   const avatarImages = [
-    '/images/avatar/IMG_5911.PNG',
-    '/images/avatar/被写体.png'
+    '/images/avatar/robot1.png',
+    '/images/avatar/robot2.png'
   ];
 
   // アバター画像を切り替えるための効果
@@ -315,12 +315,13 @@ export default function InteractiveDialoguePractice({
       </div>
       
       {/* アバター表示エリア */}
-      <div className="relative z-10 mb-6 mt-4">
-        <div className={`relative w-48 h-48 sm:w-56 sm:h-56 mx-auto ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
+      <div className="relative z-10 mb-6 mt-8">
+        <div className={`relative w-64 h-64 sm:w-80 sm:h-80 mx-auto ${isAvatarSpeaking ? 'animate-pulse' : ''}`}>
           <Image
             src={avatarImages[currentAvatarIndex]}
             alt="Customer Avatar"
             fill
+            priority
             className="object-contain"
           />
         </div>
