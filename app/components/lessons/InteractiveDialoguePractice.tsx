@@ -352,16 +352,20 @@ export default function InteractiveDialoguePractice({
 
   // 会話ターンの音声を再生
   const playDialogueAudio = (turn: DialogueTurn) => {
+    console.log('音声再生開始:', turn);
+    
     // 事前生成された音声ファイルがある場合はそれを優先
     if (turn.audioUrl) {
+      console.log('事前生成された音声URLを使用:', turn.audioUrl);
       setCurrentAudioUrl(turn.audioUrl);
       setCurrentTtsText('');
+      setIsAudioPlaying(true);
     } else {
+      console.log('テキストから音声を生成:', turn.text);
       setCurrentTtsText(turn.text);
       setCurrentAudioUrl(null);
+      setIsAudioPlaying(true);
     }
-    
-    setIsAudioPlaying(true);
     
     // 話者に応じてアバターの状態を設定
     if (turn.role === 'customer') {

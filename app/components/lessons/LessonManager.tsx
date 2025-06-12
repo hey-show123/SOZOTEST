@@ -1025,14 +1025,16 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       
       // ダイアログの音声を生成
       if (updatedLesson.dialogueTurns) {
-        for (let i = 0; i < updatedLesson.dialogueTurns.length; i++) {
+        const totalTurns = updatedLesson.dialogueTurns.length;
+        
+        for (let i = 0; i < totalTurns; i++) {
           const turn = updatedLesson.dialogueTurns[i];
           
           // スタッフの音声はノヴァ、顧客の音声はオニキスで生成
           const voice = turn.role === 'staff' ? 'nova' : 'onyx';
           
           try {
-            setUploadMessage(`ダイアログ ${i+1}/${updatedLesson.dialogueTurns.length} の音声を生成中...`);
+            setUploadMessage(`ダイアログ ${i+1}/${totalTurns} の音声を生成中...`);
             
             // 最大3回リトライ
             let retryCount = 0;
@@ -1063,13 +1065,19 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                   throw new Error(data.error);
                 }
                 
+                // audioUrlが設定されたか確認
+                if (!data.audioUrl) {
+                  throw new Error('音声URLが返されませんでした');
+                }
+                
+                // 音声URLを設定
                 updatedLesson.dialogueTurns[i].audioUrl = data.audioUrl;
-                console.log(`ダイアログ ${i+1} の音声を生成しました:`, data.audioUrl);
+                console.log(`ダイアログ ${i+1}/${totalTurns} の音声を生成しました:`, data.audioUrl);
                 success = true;
               } catch (error) {
-                lastError = error;
                 retryCount++;
-                console.warn(`ダイアログ ${i+1} の音声生成に失敗 (${retryCount}/3):`, error);
+                lastError = error;
+                console.error(`ダイアログ ${i+1}/${totalTurns} の音声生成に失敗 (${retryCount}/3):`, error);
                 
                 // リトライ前に少し待機
                 if (retryCount < 3) {
@@ -1078,22 +1086,18 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
               }
             }
             
-            // 全てのリトライが失敗した場合
             if (!success) {
-              throw lastError;
+              console.error(`ダイアログ ${i+1}/${totalTurns} の音声生成に失敗しました:`, lastError);
+              setUploadMessage(`ダイアログ ${i+1}/${totalTurns} の音声生成に失敗しました`);
             }
           } catch (error) {
-            console.error(`ダイアログ ${i+1} の音声生成エラー:`, error);
-            failedPhrases.push({ 
-              type: 'dialogueTurn', 
-              index: i, 
-              text: turn.text 
-            });
+            console.error(`ダイアログ ${i+1}/${totalTurns} の音声生成エラー:`, error);
+            setUploadMessage(`ダイアログ ${i+1}/${totalTurns} の音声生成エラー`);
           }
-          
-          // 進捗状況を更新
-          setUploadMessage(`ダイアログ ${i+1}/${updatedLesson.dialogueTurns.length} の音声を生成中...`);
         }
+        
+        // 音声生成が完了したことを表示
+        setUploadMessage(`${totalTurns}件のダイアログ音声を生成しました`);
       }
       
       // 音声生成完了フラグをセット

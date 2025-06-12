@@ -150,12 +150,14 @@ export default function AudioPlayer({
     };
   }, [text, voice, externalAudioUrl]);
 
-  // 音声URLが変更されたときに再生
+  // 音声URLが変更されたときに再生するエフェクトを修正
   useEffect(() => {
-    if (!audioUrl) return;
+    if (!audioUrl) {
+      console.log('[AudioPlayer] audioUrlが未設定のため再生しません');
+      return;
+    }
     
-    // デバッグ: 音声URLをコンソールに表示
-    console.log('[AudioPlayer] 再生準備中 - 音声URL:', audioUrl);
+    console.log('[AudioPlayer] 音声URL変更:', audioUrl);
     
     let isEffectActive = true; // このエフェクト実行中かどうかを追跡
 
@@ -181,7 +183,41 @@ export default function AudioPlayer({
           audioRef.current.onerror = (e) => {
             console.error('[AudioPlayer] 音声ファイル読み込みエラー:', e, audioRef.current?.error);
             console.log('[AudioPlayer] エラーが発生した音声URL:', audioUrl);
-            setShowPlayButton(true);
+            
+            // エラーが発生した場合の再試行
+            console.log('[AudioPlayer] 別の方法で再試行します');
+            
+            try {
+              // audio要素を新規作成して再試行
+              const newAudio = new Audio(audioUrl);
+              newAudio.onended = () => {
+                if (!isEffectActive) return;
+                console.log('[AudioPlayer] (再試行) 再生完了');
+                setIsPlaying(false);
+                if (onFinished) {
+                  onFinished();
+                }
+              };
+              
+              newAudio.onerror = (retryErr) => {
+                console.error('[AudioPlayer] (再試行) 音声ファイル読み込みエラー:', retryErr, newAudio.error);
+                setShowPlayButton(true);
+              };
+              
+              audioRef.current = newAudio;
+              
+              if (autoPlay && hasInteracted) {
+                newAudio.play().catch(playError => {
+                  console.error('[AudioPlayer] (再試行) 再生エラー:', playError);
+                  setShowPlayButton(true);
+                });
+              } else {
+                setShowPlayButton(true);
+              }
+            } catch (retryError) {
+              console.error('[AudioPlayer] 再試行中のエラー:', retryError);
+              setShowPlayButton(true);
+            }
           };
           
           // ロード時のイベントリスナー
@@ -273,7 +309,7 @@ export default function AudioPlayer({
         audioRef.current.onended = null; // イベントリスナーを削除
       }
     };
-  }, [audioUrl, autoPlay, hasInteracted]);
+  }, [audioUrl, autoPlay, hasInteracted, onFinished]);
 
   // 手動で音声を再生
   const handlePlay = async () => {
