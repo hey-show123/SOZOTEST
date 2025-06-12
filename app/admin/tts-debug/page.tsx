@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AdminLayout from '../../components/admin/AdminLayout';
 import { useRouter } from 'next/navigation';
+import { useAdmin } from '@/app/context/AdminContext';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 export default function TTSDebugPage() {
   const router = useRouter();
+  const { isAdmin } = useAdmin();
+  const [isClient, setIsClient] = useState(false);
   const [text, setText] = useState('Hello, this is a test of the TTS system.');
   const [voice, setVoice] = useState('nova');
   const [model, setModel] = useState('tts-1-hd');
@@ -19,8 +22,17 @@ export default function TTSDebugPage() {
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
 
   useEffect(() => {
-    fetchStorageFiles();
+    setIsClient(true);
   }, []);
+
+  // 管理者でない場合はログインページにリダイレクト
+  useEffect(() => {
+    if (isClient && !isAdmin) {
+      router.push('/admin');
+    } else if (isClient) {
+      fetchStorageFiles();
+    }
+  }, [isAdmin, router, isClient]);
 
   const addLog = (message: string) => {
     setLogMessages(prev => [...prev, `${new Date().toISOString().split('T')[1].split('.')[0]}: ${message}`]);
@@ -144,11 +156,30 @@ export default function TTSDebugPage() {
     }
   };
 
+  // クライアントサイドレンダリングの前は何も表示しない
+  if (!isClient) {
+    return null;
+  }
+
+  // 管理者でない場合は何も表示しない（リダイレクト処理中）
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
-    <AdminLayout>
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">TTSデバッグツール</h1>
-        
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <h1 className="text-xl font-bold text-gray-900">TTSデバッグツール</h1>
+          <div className="flex items-center space-x-4">
+            <Link href="/admin/dashboard" className="text-blue-600 hover:text-blue-800">
+              ダッシュボードに戻る
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="w-full md:w-1/2 bg-white p-4 rounded shadow">
             <h2 className="text-xl font-semibold mb-2">音声生成</h2>
@@ -308,7 +339,7 @@ export default function TTSDebugPage() {
             </div>
           </div>
         </div>
-      </div>
-    </AdminLayout>
+      </main>
+    </div>
   );
 } 
