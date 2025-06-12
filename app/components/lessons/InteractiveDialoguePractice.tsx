@@ -35,28 +35,28 @@ const DEFAULT_DIALOGUE: DialogueTurn[] = [
     text: "What would you like to do today?",
     translation: "今日はどうされますか？",
     turnNumber: 1,
-    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-1.mp3"
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/dialogue-turn-1-fixed.mp3"
   },
   {
     role: 'customer',
     text: "A haircut please, my hair feels damaged.",
     translation: "カットをお願いします。髪が傷んでいるように感じます。",
     turnNumber: 2,
-    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-2.mp3"
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/dialogue-turn-2-fixed.mp3"
   },
   {
     role: 'staff',
     text: "Would you like to do a treatment as well?",
     translation: "トリートメントもされたいですか？",
     turnNumber: 3,
-    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-3.mp3"
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/dialogue-turn-3-fixed.mp3"
   },
   {
     role: 'customer',
     text: "Sure.",
     translation: "はい",
     turnNumber: 4,
-    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-4.mp3"
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/dialogue-turn-4-fixed.mp3"
   }
 ];
 
@@ -232,7 +232,7 @@ export default function InteractiveDialoguePractice({
           console.log('全てのターンが完了しました');
           setCurrentLine(null);
         }
-      }, 1000);
+      }, 1500); // 遅延を少し長くして確実に音声が終わってから次に進むようにする
     }
   };
 
@@ -421,15 +421,45 @@ export default function InteractiveDialoguePractice({
       setIsStaffSpeaking(true);
     }
     
-    // audioUrlがnullかundefinedの場合のチェック
-    if (!turn.audioUrl) {
-      console.warn('音声URLが設定されていません。テキストから音声を生成します:', turn.text);
+    // audioUrlが有効かチェック
+    const isValidUrl = turn.audioUrl && 
+                      typeof turn.audioUrl === 'string' && 
+                      turn.audioUrl.startsWith('http');
+    
+    if (!isValidUrl) {
+      console.warn('有効な音声URLが設定されていません。テキストから音声を生成します:', turn.text);
       setCurrentAudioUrl(null);
       setCurrentTtsText(turn.text);
     } else {
       console.log('事前生成された音声URLを使用:', turn.audioUrl);
-      setCurrentTtsText('');
-      setCurrentAudioUrl(turn.audioUrl);
+      // URLの有効性をチェックするために、まずヘッドリクエストを送る
+      fetch(turn.audioUrl, { method: 'HEAD' })
+        .then(response => {
+          if (response.ok) {
+            console.log('音声URLが有効です:', turn.audioUrl);
+            setCurrentTtsText('');
+            setCurrentAudioUrl(turn.audioUrl);
+          } else {
+            console.warn('音声URLが無効です。テキストから音声を生成します:', turn.text);
+            setCurrentAudioUrl(null);
+            setCurrentTtsText(turn.text);
+          }
+          // 少し遅延させてから再生状態を設定
+          setTimeout(() => {
+            setIsAudioPlaying(true);
+          }, 100);
+        })
+        .catch(error => {
+          console.error('音声URLのチェック中にエラーが発生しました:', error);
+          // エラーが発生した場合もテキストから音声を生成
+          setCurrentAudioUrl(null);
+          setCurrentTtsText(turn.text);
+          // 少し遅延させてから再生状態を設定
+          setTimeout(() => {
+            setIsAudioPlaying(true);
+          }, 100);
+        });
+      return; // fetchの非同期処理を待つため、ここで終了
     }
     
     // 最後に再生状態を設定（少し遅延させる）

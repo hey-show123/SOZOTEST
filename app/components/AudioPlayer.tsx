@@ -156,6 +156,10 @@ export default function AudioPlayer({
       console.log('[AudioPlayer] audioUrlが未設定のため再生しません');
       // audioUrlがnullになった場合、内部状態をリセット
       setIsPlaying(false);
+      if (onFinished) {
+        console.log('[AudioPlayer] 音声URLが未設定のため、完了ハンドラを呼び出します');
+        setTimeout(onFinished, 500);
+      }
       return;
     }
     
@@ -171,55 +175,42 @@ export default function AudioPlayer({
     }
     
     let isEffectActive = true; // このエフェクト実行中かどうかを追跡
+    let audioPlayTimeout: NodeJS.Timeout | null = null;
 
     const playAudio = async () => {
       try {
         if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
         
-        // 音声ファイルが存在するか事前確認（外部URLの場合のみ）
-        if (audioUrl.startsWith('/audio/') || audioUrl.startsWith('https://')) {
-          try {
-            console.log('[AudioPlayer] 音声ファイルの存在確認:', audioUrl);
-            const response = await fetch(audioUrl, { method: 'HEAD' });
-            
-            if (!response.ok) {
-              console.error(`[AudioPlayer] 音声ファイルが見つかりません (${response.status}): ${audioUrl}`);
-              
-              // ファイルが見つからない場合、テキストがあればTTSで生成
-              if (text && text.trim() !== '') {
-                console.log('[AudioPlayer] テキストから音声を再生成します:', text);
-                
-                // テキストからTTS生成（バックアップ）
-                if (onFinished) {
-                  setTimeout(() => {
-                    onFinished();
-                  }, 500);
-                }
-                return;
-              } else {
-                // テキストがない場合はエラーとして処理
-                throw new Error(`音声ファイルが見つかりません: ${audioUrl}`);
-              }
+        // URLが実際に存在するか確認
+        try {
+          // 30秒のタイムアウトを設定
+          audioPlayTimeout = setTimeout(() => {
+            console.warn('[AudioPlayer] 音声再生がタイムアウトしました');
+            if (isEffectActive && onFinished) {
+              setIsPlaying(false);
+              onFinished();
             }
-          } catch (checkError) {
-            console.error('[AudioPlayer] 音声ファイル確認エラー:', checkError);
-            
-            // エラーが発生した場合でもテキストがあれば音声合成を試みる
-            if (text && text.trim() !== '') {
-              console.log('[AudioPlayer] エラー後、テキストから音声を再生成します:', text);
-              
-              // テキストからTTS生成（バックアップ）
-              if (onFinished) {
-                setTimeout(() => {
-                  onFinished();
-                }, 500);
-              }
-              return;
+          }, 30000);
+          
+          const response = await fetch(audioUrl, { method: 'HEAD' });
+          if (!response.ok) {
+            throw new Error(`音声ファイルが存在しません: ${response.status} ${response.statusText}`);
+          }
+        } catch (fetchError) {
+          console.error('[AudioPlayer] 音声ファイルの存在確認に失敗:', fetchError);
+          // エラーが発生した場合は完了ハンドラを呼び出して処理を続行
+          if (isEffectActive) {
+            setIsPlaying(false);
+            if (onFinished) {
+              console.log('[AudioPlayer] 音声ファイル確認エラーのため完了ハンドラを呼び出します');
+              if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
+              setTimeout(onFinished, 500);
             }
           }
+          return;
         }
         
-        // 新しいAudio要素を作成
+        // 新しいAudio要素を作成（既存のを再利用しない）
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
         
@@ -230,6 +221,7 @@ export default function AudioPlayer({
           if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
           console.log('[AudioPlayer] 再生完了');
           setIsPlaying(false);
+          if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
           if (onFinished) {
             onFinished();
           }
@@ -241,15 +233,11 @@ export default function AudioPlayer({
           console.log('[AudioPlayer] エラーが発生した音声URL:', audioUrl);
           setShowPlayButton(true);
           setIsPlaying(false);
-          
-          // テキストがある場合は、テキストから直接音声合成を試みる
-          if (text && text.trim() !== '') {
-            console.log('[AudioPlayer] エラー後、テキストから音声を再生成します:', text);
-          }
-          
+          if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
           // エラー時にも完了コールバックを呼び出す
           if (onFinished) {
-            onFinished();
+            console.log('[AudioPlayer] 音声再生エラーのため完了ハンドラを呼び出します');
+            setTimeout(onFinished, 500);
           }
         };
         
@@ -261,35 +249,58 @@ export default function AudioPlayer({
         if (autoPlay && hasInteracted) {
           try {
             console.log('[AudioPlayer] 自動再生開始');
+            
+            // 再生が始まったら再生中フラグをセット
+            audio.onplaying = () => {
+              console.log('[AudioPlayer] 再生開始イベント発生');
+              if (isEffectActive) {
+                setIsPlaying(true);
+                setShowPlayButton(false);
+              }
+            };
+            
             await audio.play();
             if (!isEffectActive) {
               console.log('[AudioPlayer] エフェクト無効化により再生中止');
               audio.pause(); // エフェクトが無効になっていたら再生を停止
+              if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
               return;
             }
+            
+            // play()が成功しても、onplaying イベントが発火するとは限らないので、ここでも設定
             setIsPlaying(true);
             setShowPlayButton(false);
           } catch (error) {
             console.warn('[AudioPlayer] 自動再生できませんでした:', error);
             setShowPlayButton(true);
             setIsPlaying(false);
+            if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
             // 再生エラー時にも完了コールバックを呼び出す
             if (onFinished) {
-              onFinished();
+              console.log('[AudioPlayer] 再生開始エラーのため完了ハンドラを呼び出します');
+              setTimeout(onFinished, 500);
             }
           }
         } else if (autoPlay && !hasInteracted) {
           // インタラクションなしの場合は再生ボタンを表示
           console.log('[AudioPlayer] ユーザーインタラクションなし - 再生ボタン表示');
           setShowPlayButton(true);
+          // 自動再生できない場合でも完了ハンドラを呼び出す
+          if (onFinished && !hasInteracted) {
+            console.log('[AudioPlayer] インタラクションなしのため完了ハンドラを呼び出します');
+            if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
+            setTimeout(onFinished, 2000);
+          }
         }
       } catch (error) {
         console.error('[AudioPlayer] 音声再生エラー:', error);
         setShowPlayButton(true);
         setIsPlaying(false);
+        if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
         // 例外発生時にも完了コールバックを呼び出す
         if (onFinished) {
-          onFinished();
+          console.log('[AudioPlayer] 例外発生のため完了ハンドラを呼び出します');
+          setTimeout(onFinished, 500);
         }
       }
     };
@@ -299,6 +310,7 @@ export default function AudioPlayer({
     // クリーンアップ関数: エフェクトが再実行されるか、コンポーネントがアンマウントされるときに実行
     return () => {
       isEffectActive = false; // エフェクトの無効化
+      if (audioPlayTimeout) clearTimeout(audioPlayTimeout);
       if (audioRef.current) {
         console.log('[AudioPlayer] エフェクト終了 - 再生停止');
         audioRef.current.pause(); // 再生中の場合は停止
@@ -306,9 +318,10 @@ export default function AudioPlayer({
         audioRef.current.onended = null;
         audioRef.current.onerror = null; 
         audioRef.current.onloadeddata = null;
+        audioRef.current.onplaying = null;
       }
     };
-  }, [audioUrl, autoPlay, hasInteracted, onFinished, text]);
+  }, [audioUrl, autoPlay, hasInteracted, onFinished]);
 
   // 手動で音声を再生
   const handlePlay = async () => {
