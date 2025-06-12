@@ -214,8 +214,8 @@ export async function POST(req: Request) {
 
     // ファイルを保存するかどうか
     if (save) {
-      // Supabaseが設定されていない場合か開発環境の場合はローカルに保存
-      if (!isSupabaseConfigured || isDevelopment) {
+      // Supabaseを優先して使用し、失敗した場合のみローカルにフォールバック
+      if (!isSupabaseConfigured || isDevelopment)
         // ディレクトリが存在しない場合は作成
         ensureDirectoryExists(AUDIO_DIR);
 
@@ -252,14 +252,20 @@ export async function POST(req: Request) {
         // 本番環境: Supabaseのストレージに保存
         try {
           // ファイルがすでに存在するか確認
-          const { data: existingFile } = await supabase
+          const { data: existingFile, error: checkError } = await supabase
             .storage
             .from(STORAGE_BUCKET)
             .getPublicUrl(fileName);
           
+          if (checkError) {
+            console.error('Supabase存在確認エラー:', checkError);
+            throw new Error(`Supabase存在確認エラー: ${checkError.message}`);
+          }
+          
           if (existingFile) {
             // 既存のファイルのURLを使用
             audioUrl = existingFile.publicUrl;
+            console.log('既存の音声ファイルを使用:', audioUrl);
             
             return NextResponse.json({
               audioUrl,
@@ -268,6 +274,7 @@ export async function POST(req: Request) {
           }
           
           // OpenAI APIを呼び出して音声を生成
+          console.log('OpenAI APIで音声生成中...');
           const mp3 = await openai.audio.speech.create({
             model: model,
             voice: voice,
@@ -276,8 +283,10 @@ export async function POST(req: Request) {
 
           // 音声データをバッファに変換
           const buffer = Buffer.from(await mp3.arrayBuffer());
+          console.log('音声バッファを取得:', buffer.length, 'バイト');
           
           // Supabaseのストレージにアップロード
+          console.log('Supabaseにアップロード中...');
           const { data, error } = await supabase
             .storage
             .from(STORAGE_BUCKET)
@@ -287,38 +296,60 @@ export async function POST(req: Request) {
             });
           
           if (error) {
+            console.error('Supabaseアップロードエラー:', error);
             throw new Error('Supabaseへの音声ファイルアップロードエラー: ' + error.message);
           }
           
           // 公開URLを取得
-          const { data: urlData } = await supabase
+          const { data: urlData, error: urlError } = await supabase
             .storage
             .from(STORAGE_BUCKET)
             .getPublicUrl(fileName);
           
+          if (urlError) {
+            console.error('Supabase公開URL取得エラー:', urlError);
+            throw new Error('公開URL取得エラー: ' + urlError.message);
+          }
+          
           audioUrl = urlData.publicUrl;
+          console.log('音声ファイルのURL:', audioUrl);
         } catch (error) {
           console.error('Supabase処理エラー、ローカルファイルシステムにフォールバック:', error);
           
           // エラー時はローカルに保存
-          ensureDirectoryExists(AUDIO_DIR);
-          const filePath = path.join(AUDIO_DIR, fileName);
-          
-          // OpenAI APIを呼び出して音声を生成（再度呼び出し）
-          const mp3 = await openai.audio.speech.create({
-            model: model,
-            voice: voice,
-            input: text,
-          });
-          
-          // 音声データをバッファに変換
-          const buffer = Buffer.from(await mp3.arrayBuffer());
-          
-          // ファイルに保存
-          fs.writeFileSync(filePath, buffer);
-          
-          // 音声URLを設定
-          audioUrl = `/audio/${fileName}`;
+          try {
+            // ディレクトリ確認
+            console.log('ローカルファイルシステムにフォールバック');
+            ensureDirectoryExists(AUDIO_DIR);
+            console.log('ディレクトリ確認:', AUDIO_DIR);
+            
+            const filePath = path.join(AUDIO_DIR, fileName);
+            console.log('保存先ファイルパス:', filePath);
+            
+            // OpenAI APIを呼び出して音声を生成（再度呼び出し）
+            console.log('OpenAI APIで音声を再生成中...');
+            const mp3 = await openai.audio.speech.create({
+              model: model,
+              voice: voice,
+              input: text,
+            });
+            
+            // 音声データをバッファに変換
+            const buffer = Buffer.from(await mp3.arrayBuffer());
+            console.log('音声バッファを取得:', buffer.length, 'バイト');
+            
+            // ファイルに保存
+            console.log('ファイルに保存中...');
+            fs.writeFileSync(filePath, buffer);
+            console.log('ファイル保存完了:', filePath);
+            
+            // 音声URLを設定
+            audioUrl = `/audio/${fileName}`;
+            console.log('音声URL設定:', audioUrl);
+          } catch (saveError) {
+            console.error('ローカル保存エラー:', saveError);
+            throw new Error('ローカルファイル保存エラー: ' + (saveError instanceof Error ? saveError.message : String(saveError)));
+          }
         }
       }
       

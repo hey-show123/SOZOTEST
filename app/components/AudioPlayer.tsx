@@ -148,6 +148,9 @@ export default function AudioPlayer({
   useEffect(() => {
     if (!audioUrl) return;
     
+    // デバッグ: 音声URLをコンソールに表示
+    console.log('再生する音声URL:', audioUrl);
+    
     let isEffectActive = true; // このエフェクト実行中かどうかを追跡
 
     const playAudio = async () => {
@@ -164,6 +167,13 @@ export default function AudioPlayer({
             if (onFinished) {
               onFinished();
             }
+          };
+          
+          // エラーハンドリングを追加
+          audioRef.current.onerror = (e) => {
+            console.error('音声ファイル読み込みエラー:', e, audioRef.current?.error);
+            console.log('エラーが発生した音声URL:', audioUrl);
+            setShowPlayButton(true);
           };
           
           if (autoPlay && hasInteracted) {
