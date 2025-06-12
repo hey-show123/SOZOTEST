@@ -34,25 +34,29 @@ const DEFAULT_DIALOGUE: DialogueTurn[] = [
     role: 'staff',
     text: "What would you like to do today?",
     translation: "今日はどうされますか？",
-    turnNumber: 1
+    turnNumber: 1,
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-1.mp3"
   },
   {
     role: 'customer',
     text: "A haircut please, my hair feels damaged.",
     translation: "カットをお願いします。髪が傷んでいるように感じます。",
-    turnNumber: 2
+    turnNumber: 2,
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-2.mp3"
   },
   {
     role: 'staff',
     text: "Would you like to do a treatment as well?",
     translation: "トリートメントもされたいですか？",
-    turnNumber: 3
+    turnNumber: 3,
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-3.mp3"
   },
   {
     role: 'customer',
     text: "Sure.",
     translation: "はい",
-    turnNumber: 4
+    turnNumber: 4,
+    audioUrl: "https://xkrdzdvhvfhpsxyayiil.supabase.co/storage/v1/object/public/audio-files/test-dialogue-turn-4.mp3"
   }
 ];
 
@@ -131,45 +135,60 @@ export default function InteractiveDialoguePractice({
     // 初期ダイアログラインを設定
     if (dialogue && dialogue.length > 0) {
       // 最初のターンのラインを設定
-      setCurrentLine(dialogue[0]);
+      const firstLine = dialogue[0];
+      setCurrentLine(firstLine);
+      console.log('最初のターンを設定:', firstLine);
       
       // 最初のラインがスタッフ（ユーザー）のセリフなら会話履歴に追加せず、そのまま表示
       // お客さん（システム）のセリフなら自動再生の準備をする
-      if (dialogue[0].role === 'customer') {
+      if (firstLine.role === 'customer') {
         // 少し遅延させてから再生
         setTimeout(() => {
           // 既に音声が再生中でないことを確認
           if (!isAudioPlaying) {
             console.log('初期セットアップ - お客さんの発言を自動再生');
-            playDialogueAudio(dialogue[0]);
             
             // 会話履歴に追加
             setConversationHistory([{
               role: 'customer',
-              text: dialogue[0].text,
-              translation: dialogue[0].translation
+              text: firstLine.text,
+              translation: firstLine.translation
             }]);
+            
+            // 音声を再生
+            playDialogueAudio(firstLine);
           }
         }, 1000);
       }
     }
-  }, [dialogue]);
+    
+    // コンポーネントのクリーンアップ
+    return () => {
+      console.log('InteractiveDialoguePracticeコンポーネントのクリーンアップ');
+      setIsAudioPlaying(false);
+      setIsAvatarSpeaking(false);
+      setCurrentAudioUrl(null);
+      setCurrentTtsText('');
+    };
+  }, []);
 
   // 現在のターンが変わった時、お客さんのセリフなら自動再生
   useEffect(() => {
     // ターンが変わったとき
     if (currentTurn > 1 && currentTurn <= dialogue.length) {
+      console.log(`ターンが変更されました: ${currentTurn}`);
+      
       // 新しいラインを取得
       const newLine = dialogue[currentTurn - 1];
+      console.log('新しいターン:', newLine);
       setCurrentLine(newLine);
       
       // お客さんのセリフなら自動再生（既に再生中でない場合のみ）
-      if (newLine && newLine.role === 'customer' && !isAudioPlaying) {
+      if (newLine && newLine.role === 'customer') {
         setTimeout(() => {
           // お客さんのセリフを自動再生（二重チェック）
           if (!isAudioPlaying) {
             console.log('ターン変更 - お客さんの発言を自動再生');
-            playDialogueAudio(newLine);
             
             // 会話履歴に追加
             setConversationHistory(prev => [
@@ -180,6 +199,9 @@ export default function InteractiveDialoguePractice({
                 translation: newLine.translation
               }
             ]);
+            
+            // 音声を再生
+            playDialogueAudio(newLine);
           }
         }, 500);
       }
@@ -196,12 +218,8 @@ export default function InteractiveDialoguePractice({
     setIsCustomerSpeaking(false);
     setIsStaffSpeaking(false);
     
-    // 現在のターンとラインを明示的にログ出力
-    console.log('音声再生終了時の状態 - currentTurn:', currentTurn, 'currentLine:', currentLine);
-    
     // 現在のターンがお客さんの場合は自動で次へ進む
     if (currentLine && currentLine.role === 'customer') {
-      // 明示的に遅延を設定して次のターンに進む
       setTimeout(() => {
         const nextTurn = currentTurn + 1;
         
@@ -391,22 +409,6 @@ export default function InteractiveDialoguePractice({
       return;
     }
     
-    // ファイル名を直接生成（APIと同じロジックを使用）
-    let audioUrl = '';
-    const voice = turn.role === 'customer' ? 'onyx' : 'nova';
-    
-    // 事前生成された音声ファイルがある場合はそれを優先
-    if (turn.audioUrl) {
-      console.log('事前生成された音声URLを使用:', turn.audioUrl);
-      audioUrl = turn.audioUrl;
-    } else {
-      // ファイル名を生成（APIと同じロジック）
-      const crypto = require('crypto');
-      const hash = crypto.createHash('md5').update(`${turn.text}-${voice}`).digest('hex');
-      audioUrl = `/audio/${hash}.mp3`;
-      console.log('生成された音声URLを使用:', audioUrl);
-    }
-    
     // 音声再生のためのUI状態を設定
     setIsAvatarSpeaking(true);
     
@@ -419,13 +421,15 @@ export default function InteractiveDialoguePractice({
       setIsStaffSpeaking(true);
     }
     
-    // AudioPlayerに渡すデータを設定
-    if (audioUrl) {
-      setCurrentTtsText(''); // テキストをクリア
-      setCurrentAudioUrl(audioUrl);
-    } else {
-      setCurrentAudioUrl(null); // URLをクリア
+    // audioUrlがnullかundefinedの場合のチェック
+    if (!turn.audioUrl) {
+      console.warn('音声URLが設定されていません。テキストから音声を生成します:', turn.text);
+      setCurrentAudioUrl(null);
       setCurrentTtsText(turn.text);
+    } else {
+      console.log('事前生成された音声URLを使用:', turn.audioUrl);
+      setCurrentTtsText('');
+      setCurrentAudioUrl(turn.audioUrl);
     }
     
     // 最後に再生状態を設定（少し遅延させる）
