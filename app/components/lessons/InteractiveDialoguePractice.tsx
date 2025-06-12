@@ -108,6 +108,26 @@ export default function InteractiveDialoguePractice({
   
   // コンポーネントがマウントされたら初期セットアップ
   useEffect(() => {
+    // ダイアログの内容をデバッグ出力
+    console.log('ダイアログ内容:', dialogue);
+    
+    // 音声URLの有無を確認
+    const hasAudioUrls = dialogue.filter(turn => turn.audioUrl).length;
+    console.log(`音声URL付きのターン数: ${hasAudioUrls}/${dialogue.length}`);
+    
+    if (hasAudioUrls === 0) {
+      console.warn('音声URLが設定されているターンがありません。音声が再生されない可能性があります。');
+    } else {
+      // 各ターンの音声URL情報を出力
+      dialogue.forEach((turn, index) => {
+        if (turn.audioUrl) {
+          console.log(`ターン${index + 1} 音声URL:`, turn.audioUrl);
+        } else {
+          console.warn(`ターン${index + 1} 音声URLなし:`, turn.text);
+        }
+      });
+    }
+
     // 初期ダイアログラインを設定
     if (dialogue && dialogue.length > 0) {
       // 最初のターンのラインを設定
@@ -169,8 +189,12 @@ export default function InteractiveDialoguePractice({
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     console.log('音声再生終了ハンドラー呼び出し');
+    
+    // 状態をクリア
     setIsAudioPlaying(false);
     setIsAvatarSpeaking(false);
+    setIsCustomerSpeaking(false);
+    setIsStaffSpeaking(false);
     
     // 現在のターンがお客さんの場合は自動で次へ進む
     if (currentLine && currentLine.role === 'customer') {
@@ -179,15 +203,14 @@ export default function InteractiveDialoguePractice({
         
         // 次の行がある場合はターンを進める
         if (nextTurn <= dialogue.length) {
+          console.log(`次のターン(${nextTurn})に進みます`);
           setCurrentTurn(nextTurn);
         } else {
           // 最後のターンが終わったら完了状態に
+          console.log('全てのターンが完了しました');
           setCurrentLine(null);
         }
       }, 1000);
-    } else {
-      // スタッフのターンの場合は音声プレイヤーのみ止める
-      setIsStaffSpeaking(false);
     }
   };
 
@@ -364,18 +387,8 @@ export default function InteractiveDialoguePractice({
       return;
     }
     
-    // 事前生成された音声ファイルがある場合はそれを優先
-    if (turn.audioUrl) {
-      console.log('事前生成された音声URLを使用:', turn.audioUrl);
-      setCurrentAudioUrl(turn.audioUrl);
-      setCurrentTtsText('');
-      setIsAudioPlaying(true);
-    } else {
-      console.log('テキストから音声を生成:', turn.text);
-      setCurrentTtsText(turn.text);
-      setCurrentAudioUrl(null);
-      setIsAudioPlaying(true);
-    }
+    // 音声再生のためのUI状態を設定
+    setIsAvatarSpeaking(true);
     
     // 話者に応じてアバターの状態を設定
     if (turn.role === 'customer') {
@@ -384,6 +397,27 @@ export default function InteractiveDialoguePractice({
     } else {
       setIsCustomerSpeaking(false);
       setIsStaffSpeaking(true);
+    }
+    
+    // 事前生成された音声ファイルがある場合はそれを優先
+    if (turn.audioUrl) {
+      console.log('事前生成された音声URLを使用:', turn.audioUrl);
+      setCurrentTtsText(''); // テキストをクリア
+      setCurrentAudioUrl(turn.audioUrl);
+      
+      // 最後に再生状態を設定
+      setTimeout(() => {
+        setIsAudioPlaying(true);
+      }, 100);
+    } else {
+      console.log('テキストから音声を生成:', turn.text);
+      setCurrentAudioUrl(null); // URLをクリア
+      setCurrentTtsText(turn.text);
+      
+      // 最後に再生状態を設定
+      setTimeout(() => {
+        setIsAudioPlaying(true);
+      }, 100);
     }
   };
 
