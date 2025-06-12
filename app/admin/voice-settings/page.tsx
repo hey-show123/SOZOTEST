@@ -9,6 +9,130 @@ import { VoiceProvider } from '@/app/context/VoiceContext';
 import ModelSelector from '../../components/ModelSelector';
 import { ModelProvider } from '@/app/context/ModelContext';
 
+// TTSテスト機能コンポーネント
+function TTSTestTool() {
+  const [testText, setTestText] = useState('これはテスト音声です。音声生成機能の動作確認をしています。');
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  // テスト音声を生成する
+  const generateTestAudio = async () => {
+    if (!testText.trim()) return;
+    
+    setIsTesting(true);
+    setTestResult(null);
+    setTestError(null);
+    setAudioUrl(null);
+    
+    try {
+      const response = await fetch('/api/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: testText,
+          voice: 'nova',
+          model: 'tts-1-hd',
+          save: true // ファイルとして保存
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        setTestError(`エラー: ${data.error}`);
+      } else {
+        setAudioUrl(data.audioUrl);
+        setTestResult(`音声生成成功: ${data.audioUrl}`);
+      }
+    } catch (error) {
+      setTestError(`エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  // Supabase ストレージの状態を確認
+  const checkSupabaseStorage = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    setTestError(null);
+    
+    try {
+      const response = await fetch('/api/check-storage', {
+        method: 'GET',
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        setTestError(`Supabaseストレージエラー: ${data.error}`);
+      } else {
+        setTestResult(`Supabaseストレージ状態: ${data.message}\n${data.files ? `ファイル数: ${data.files.length}` : ''}`);
+      }
+    } catch (error) {
+      setTestError(`エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  return (
+    <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+      <h3 className="text-lg font-medium text-gray-900 mb-3">音声生成テスト</h3>
+      
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">テストテキスト</label>
+        <textarea
+          value={testText}
+          onChange={(e) => setTestText(e.target.value)}
+          className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+          rows={3}
+        />
+      </div>
+      
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={generateTestAudio}
+          disabled={isTesting}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+        >
+          {isTesting ? '処理中...' : '音声テスト生成'}
+        </button>
+        
+        <button
+          onClick={checkSupabaseStorage}
+          disabled={isTesting}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition disabled:opacity-50"
+        >
+          {isTesting ? '確認中...' : 'Supabaseストレージ確認'}
+        </button>
+      </div>
+      
+      {audioUrl && (
+        <div className="mb-4">
+          <audio src={audioUrl} controls className="w-full" />
+        </div>
+      )}
+      
+      {testResult && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded text-green-800 mb-4">
+          <pre className="whitespace-pre-wrap text-sm">{testResult}</pre>
+        </div>
+      )}
+      
+      {testError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 mb-4">
+          <pre className="whitespace-pre-wrap text-sm">{testError}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 音声読み上げスピード設定コンポーネント
 function SpeechRateSelector() {
   const [speechRate, setSpeechRate] = useState('1.0');
@@ -113,6 +237,9 @@ export default function VoiceSettingsPage() {
           <div className="p-6">
             <ModelProvider>
               <VoiceProvider>
+                {/* TTSテスト機能 */}
+                <TTSTestTool />
+                
                 {/* 音声選択 */}
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                   <h3 className="text-lg font-medium text-gray-900 mb-3">音声の種類</h3>
