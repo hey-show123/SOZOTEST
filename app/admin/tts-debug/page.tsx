@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AdminLayout from '@/app/components/admin/AdminLayout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
