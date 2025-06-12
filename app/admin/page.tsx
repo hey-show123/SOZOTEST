@@ -113,6 +113,9 @@ export default function AdminLoginPage() {
         <Link href="/admin/tts-debug" className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-4 px-6 rounded-lg shadow-md text-center">
           TTSデバッグツール
         </Link>
+        <Link href="/admin/debug-audio" className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-4 px-6 rounded-lg shadow-md text-center">
+          音声診断ツール
+        </Link>
       </div>
     </div>
   );

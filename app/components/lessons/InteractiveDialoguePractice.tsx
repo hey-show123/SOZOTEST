@@ -196,8 +196,12 @@ export default function InteractiveDialoguePractice({
     setIsCustomerSpeaking(false);
     setIsStaffSpeaking(false);
     
+    // 現在のターンとラインを明示的にログ出力
+    console.log('音声再生終了時の状態 - currentTurn:', currentTurn, 'currentLine:', currentLine);
+    
     // 現在のターンがお客さんの場合は自動で次へ進む
     if (currentLine && currentLine.role === 'customer') {
+      // 明示的に遅延を設定して次のターンに進む
       setTimeout(() => {
         const nextTurn = currentTurn + 1;
         
@@ -387,6 +391,22 @@ export default function InteractiveDialoguePractice({
       return;
     }
     
+    // ファイル名を直接生成（APIと同じロジックを使用）
+    let audioUrl = '';
+    const voice = turn.role === 'customer' ? 'onyx' : 'nova';
+    
+    // 事前生成された音声ファイルがある場合はそれを優先
+    if (turn.audioUrl) {
+      console.log('事前生成された音声URLを使用:', turn.audioUrl);
+      audioUrl = turn.audioUrl;
+    } else {
+      // ファイル名を生成（APIと同じロジック）
+      const crypto = require('crypto');
+      const hash = crypto.createHash('md5').update(`${turn.text}-${voice}`).digest('hex');
+      audioUrl = `/audio/${hash}.mp3`;
+      console.log('生成された音声URLを使用:', audioUrl);
+    }
+    
     // 音声再生のためのUI状態を設定
     setIsAvatarSpeaking(true);
     
@@ -399,26 +419,19 @@ export default function InteractiveDialoguePractice({
       setIsStaffSpeaking(true);
     }
     
-    // 事前生成された音声ファイルがある場合はそれを優先
-    if (turn.audioUrl) {
-      console.log('事前生成された音声URLを使用:', turn.audioUrl);
+    // AudioPlayerに渡すデータを設定
+    if (audioUrl) {
       setCurrentTtsText(''); // テキストをクリア
-      setCurrentAudioUrl(turn.audioUrl);
-      
-      // 最後に再生状態を設定
-      setTimeout(() => {
-        setIsAudioPlaying(true);
-      }, 100);
+      setCurrentAudioUrl(audioUrl);
     } else {
-      console.log('テキストから音声を生成:', turn.text);
       setCurrentAudioUrl(null); // URLをクリア
       setCurrentTtsText(turn.text);
-      
-      // 最後に再生状態を設定
-      setTimeout(() => {
-        setIsAudioPlaying(true);
-      }, 100);
     }
+    
+    // 最後に再生状態を設定（少し遅延させる）
+    setTimeout(() => {
+      setIsAudioPlaying(true);
+    }, 100);
   };
 
   return (

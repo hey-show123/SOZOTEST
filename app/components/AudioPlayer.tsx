@@ -176,7 +176,50 @@ export default function AudioPlayer({
       try {
         if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
         
-        // 新しいAudio要素を作成（既存のを再利用しない）
+        // 音声ファイルが存在するか事前確認（外部URLの場合のみ）
+        if (audioUrl.startsWith('/audio/') || audioUrl.startsWith('https://')) {
+          try {
+            console.log('[AudioPlayer] 音声ファイルの存在確認:', audioUrl);
+            const response = await fetch(audioUrl, { method: 'HEAD' });
+            
+            if (!response.ok) {
+              console.error(`[AudioPlayer] 音声ファイルが見つかりません (${response.status}): ${audioUrl}`);
+              
+              // ファイルが見つからない場合、テキストがあればTTSで生成
+              if (text && text.trim() !== '') {
+                console.log('[AudioPlayer] テキストから音声を再生成します:', text);
+                
+                // テキストからTTS生成（バックアップ）
+                if (onFinished) {
+                  setTimeout(() => {
+                    onFinished();
+                  }, 500);
+                }
+                return;
+              } else {
+                // テキストがない場合はエラーとして処理
+                throw new Error(`音声ファイルが見つかりません: ${audioUrl}`);
+              }
+            }
+          } catch (checkError) {
+            console.error('[AudioPlayer] 音声ファイル確認エラー:', checkError);
+            
+            // エラーが発生した場合でもテキストがあれば音声合成を試みる
+            if (text && text.trim() !== '') {
+              console.log('[AudioPlayer] エラー後、テキストから音声を再生成します:', text);
+              
+              // テキストからTTS生成（バックアップ）
+              if (onFinished) {
+                setTimeout(() => {
+                  onFinished();
+                }, 500);
+              }
+              return;
+            }
+          }
+        }
+        
+        // 新しいAudio要素を作成
         const audio = new Audio(audioUrl);
         audioRef.current = audio;
         
@@ -198,6 +241,12 @@ export default function AudioPlayer({
           console.log('[AudioPlayer] エラーが発生した音声URL:', audioUrl);
           setShowPlayButton(true);
           setIsPlaying(false);
+          
+          // テキストがある場合は、テキストから直接音声合成を試みる
+          if (text && text.trim() !== '') {
+            console.log('[AudioPlayer] エラー後、テキストから音声を再生成します:', text);
+          }
+          
           // エラー時にも完了コールバックを呼び出す
           if (onFinished) {
             onFinished();
@@ -259,7 +308,7 @@ export default function AudioPlayer({
         audioRef.current.onloadeddata = null;
       }
     };
-  }, [audioUrl, autoPlay, hasInteracted, onFinished]);
+  }, [audioUrl, autoPlay, hasInteracted, onFinished, text]);
 
   // 手動で音声を再生
   const handlePlay = async () => {
