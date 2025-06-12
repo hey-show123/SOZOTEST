@@ -59,6 +59,7 @@ export default function AudioPlayer({
   // 外部から音声URLが提供されている場合はそれを使用
   useEffect(() => {
     if (externalAudioUrl) {
+      console.log('[AudioPlayer] 外部音声URL設定:', externalAudioUrl);
       setAudioUrl(externalAudioUrl);
       return; // 外部URLがある場合はAPIを呼び出さない
     }
@@ -72,6 +73,7 @@ export default function AudioPlayer({
         
         // APIキーが設定されていない場合やAPIサーバーに問題がある場合のエラーハンドリング
         try {
+          console.log('[AudioPlayer] TTS生成開始 - テキスト:', text.substring(0, 30) + (text.length > 30 ? '...' : ''));
           // TTS APIを呼び出し
           const response = await fetch('/api/text-to-speech', {
             method: 'POST',
@@ -82,7 +84,7 @@ export default function AudioPlayer({
           });
 
           if (!response.ok) {
-            console.error('TTS APIエラー:', response.status, response.statusText);
+            console.error('[AudioPlayer] TTS APIエラー:', response.status, response.statusText);
             // エラーが発生した場合はフォールバック：再生ボタンを表示せず、完了ハンドラを呼び出す
             if (onFinished) {
               onFinished();
@@ -96,7 +98,7 @@ export default function AudioPlayer({
             
             // ダミーの音声URLの場合は特別処理
             if (data.isDummy) {
-              console.log('ダミー音声URLが返されました。APIキーが設定されていません。');
+              console.log('[AudioPlayer] ダミー音声URLが返されました。APIキーが設定されていません。');
               // ダミーURLでも処理を続行し、完了ハンドラを呼び出す
               if (onFinished) {
                 onFinished();
@@ -104,9 +106,11 @@ export default function AudioPlayer({
               return;
             }
             
+            console.log('[AudioPlayer] 音声URL取得成功:', data.audioUrl);
             setAudioUrl(data.audioUrl);
           } else {
             // バイナリレスポンスの場合（新規生成された音声）
+            console.log('[AudioPlayer] バイナリ音声データ受信');
             // 音声データを取得してBlobに変換
             const audioBlob = await response.blob();
             // 既存のURLを解放
@@ -114,10 +118,11 @@ export default function AudioPlayer({
               URL.revokeObjectURL(audioUrl);
             }
             const newAudioUrl = URL.createObjectURL(audioBlob);
+            console.log('[AudioPlayer] BlobURL生成:', newAudioUrl);
             setAudioUrl(newAudioUrl);
           }
         } catch (error) {
-          console.error('音声生成エラー:', error);
+          console.error('[AudioPlayer] 音声生成エラー:', error);
           setShowPlayButton(false);
           // エラー時は再生を行わず、完了ハンドラを呼び出して処理を続行
           if (onFinished) {
@@ -125,7 +130,7 @@ export default function AudioPlayer({
           }
         }
       } catch (error) {
-        console.error('TTS生成処理エラー:', error);
+        console.error('[AudioPlayer] TTS生成処理エラー:', error);
         // 最終的なエラーハンドリング：完了ハンドラを呼び出して処理を続行
         if (onFinished) {
           onFinished();
@@ -139,6 +144,7 @@ export default function AudioPlayer({
     return () => {
       // Blobから作成したURLのみ解放（サーバー上のファイルパスは解放しない）
       if (audioUrl && !externalAudioUrl && audioUrl.startsWith('blob:')) {
+        console.log('[AudioPlayer] BlobURL解放:', audioUrl);
         URL.revokeObjectURL(audioUrl);
       }
     };
@@ -149,7 +155,7 @@ export default function AudioPlayer({
     if (!audioUrl) return;
     
     // デバッグ: 音声URLをコンソールに表示
-    console.log('再生する音声URL:', audioUrl);
+    console.log('[AudioPlayer] 再生準備中 - 音声URL:', audioUrl);
     
     let isEffectActive = true; // このエフェクト実行中かどうかを追跡
 
@@ -158,11 +164,13 @@ export default function AudioPlayer({
         if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
         
         if (audioRef.current) {
+          console.log('[AudioPlayer] 既存のaudio要素にURLを設定:', audioUrl);
           audioRef.current.src = audioUrl;
           
           // 再生終了時のイベントリスナー
           audioRef.current.onended = () => {
             if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
+            console.log('[AudioPlayer] 再生完了');
             setIsPlaying(false);
             if (onFinished) {
               onFinished();
@@ -171,59 +179,85 @@ export default function AudioPlayer({
           
           // エラーハンドリングを追加
           audioRef.current.onerror = (e) => {
-            console.error('音声ファイル読み込みエラー:', e, audioRef.current?.error);
-            console.log('エラーが発生した音声URL:', audioUrl);
+            console.error('[AudioPlayer] 音声ファイル読み込みエラー:', e, audioRef.current?.error);
+            console.log('[AudioPlayer] エラーが発生した音声URL:', audioUrl);
             setShowPlayButton(true);
+          };
+          
+          // ロード時のイベントリスナー
+          audioRef.current.onloadeddata = () => {
+            console.log('[AudioPlayer] 音声データのロード完了:', audioUrl);
           };
           
           if (autoPlay && hasInteracted) {
             try {
+              console.log('[AudioPlayer] 自動再生開始');
               await audioRef.current.play();
               if (!isEffectActive) {
+                console.log('[AudioPlayer] エフェクト無効化により再生中止');
                 audioRef.current.pause(); // エフェクトが無効になっていたら再生を停止
                 return;
               }
               setIsPlaying(true);
               setShowPlayButton(false);
             } catch (error) {
-              console.warn('自動再生できませんでした:', error);
+              console.warn('[AudioPlayer] 自動再生できませんでした:', error);
               setShowPlayButton(true);
             }
           } else if (autoPlay && !hasInteracted) {
             // インタラクションなしの場合は再生ボタンを表示
+            console.log('[AudioPlayer] ユーザーインタラクションなし - 再生ボタン表示');
             setShowPlayButton(true);
           }
         } else {
+          console.log('[AudioPlayer] 新しいaudio要素を作成');
           const audio = new Audio(audioUrl);
           audio.onended = () => {
             if (!isEffectActive) return; // エフェクトが無効になっていたら処理を中止
+            console.log('[AudioPlayer] 再生完了');
             setIsPlaying(false);
             if (onFinished) {
               onFinished();
             }
           };
+          
+          // エラーハンドリングを追加
+          audio.onerror = (e) => {
+            console.error('[AudioPlayer] 音声ファイル読み込みエラー:', e, audio.error);
+            console.log('[AudioPlayer] エラーが発生した音声URL:', audioUrl);
+            setShowPlayButton(true);
+          };
+          
+          // ロード時のイベントリスナー
+          audio.onloadeddata = () => {
+            console.log('[AudioPlayer] 音声データのロード完了:', audioUrl);
+          };
+          
           audioRef.current = audio;
           
           if (autoPlay && hasInteracted) {
             try {
+              console.log('[AudioPlayer] 自動再生開始');
               await audio.play();
               if (!isEffectActive) {
+                console.log('[AudioPlayer] エフェクト無効化により再生中止');
                 audio.pause(); // エフェクトが無効になっていたら再生を停止
                 return;
               }
               setIsPlaying(true);
               setShowPlayButton(false);
             } catch (error) {
-              console.warn('自動再生できませんでした:', error);
+              console.warn('[AudioPlayer] 自動再生できませんでした:', error);
               setShowPlayButton(true);
             }
           } else if (autoPlay && !hasInteracted) {
             // インタラクションなしの場合は再生ボタンを表示
+            console.log('[AudioPlayer] ユーザーインタラクションなし - 再生ボタン表示');
             setShowPlayButton(true);
           }
         }
       } catch (error) {
-        console.error('音声再生エラー:', error);
+        console.error('[AudioPlayer] 音声再生エラー:', error);
         setShowPlayButton(true);
       }
     };
@@ -234,6 +268,7 @@ export default function AudioPlayer({
     return () => {
       isEffectActive = false; // エフェクトの無効化
       if (audioRef.current) {
+        console.log('[AudioPlayer] エフェクト終了 - 再生停止');
         audioRef.current.pause(); // 再生中の場合は停止
         audioRef.current.onended = null; // イベントリスナーを削除
       }

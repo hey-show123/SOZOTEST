@@ -99,6 +99,21 @@ export default function AdminLoginPage() {
           </div>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+        <Link href="/admin/lessons" className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 px-6 rounded-lg shadow-md text-center">
+          レッスン管理
+        </Link>
+        <Link href="/admin/recordings" className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-4 px-6 rounded-lg shadow-md text-center">
+          録音管理
+        </Link>
+        <Link href="/admin/voice-settings" className="bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-6 rounded-lg shadow-md text-center">
+          音声設定
+        </Link>
+        <Link href="/admin/tts-debug" className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-4 px-6 rounded-lg shadow-md text-center">
+          TTSデバッグツール
+        </Link>
+      </div>
     </div>
   );
 } 

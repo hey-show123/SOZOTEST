@@ -108,26 +108,34 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    pdfUrl: string;
+    systemPrompt: string;
+    level: 'beginner' | 'intermediate' | 'advanced';
+    tags: string;
+    keyPhraseText: string;
+    keyPhraseTranslation: string;
+    dialogueText: string;
+    dialogueTurns: DialogueTurn[];
+    goalsText: string;
+    headerTitle: string;
+  }>({
     id: '',
     title: '',
     description: '',
     pdfUrl: '',
     systemPrompt: '',
-    level: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
+    level: 'beginner',
     tags: '',
     keyPhraseText: '',
     keyPhraseTranslation: '',
-    dialogueText: '', // 古い形式のダイアログテキスト（互換性のために残す）
-    dialogueTurns: [] as {
-      role: 'staff' | 'customer';
-      text: string;
-      translation: string;
-      turnNumber: number;
-    }[], // 新しい構造化されたダイアログデータ
-    goalsText: '', 
+    dialogueText: '',
+    dialogueTurns: [],
+    goalsText: '',
     headerTitle: '',
-    startButtonText: ''
   });
 
   // フォームをリセットする関数
@@ -146,7 +154,6 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       dialogueTurns: [],
       goalsText: '',
       headerTitle: '',
-      startButtonText: ''
     });
     setCurrentLesson(null);
   };
@@ -537,7 +544,6 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       })),
       goalsText: DEFAULT_LESSONS[0].goals?.map(goal => goal.text).join('\n') || '',
       headerTitle: DEFAULT_LESSONS[0].headerTitle || '',
-      startButtonText: DEFAULT_LESSONS[0].startButtonText || 'レッスン開始'
     });
     setIsAdding(true);
     setIsEditing(false);
@@ -583,7 +589,6 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       })),
       goalsText,
       headerTitle: lesson.headerTitle || DEFAULT_LESSONS[0].headerTitle || '',
-      startButtonText: lesson.startButtonText || DEFAULT_LESSONS[0].startButtonText || 'レッスン開始'
     });
     setIsEditing(true);
     setIsAdding(false);
@@ -613,7 +618,7 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       updatedAt: Date.now(),
       audioGenerated: isEditing && currentLesson ? currentLesson.audioGenerated : false,
       headerTitle: formData.headerTitle,
-      startButtonText: formData.startButtonText
+      startButtonText: 'レッスン開始', // 常に固定値を使用
     };
 
     // キーフレーズの設定
@@ -973,31 +978,49 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
     setUploadStatus('uploading');
     setUploadMessage('レッスン音声を生成中...');
     
+    // 生成失敗したフレーズを記録
+    const failedPhrases: { type: string, index?: number, text: string }[] = [];
+    
     try {
       // 更新用のレッスンコピーを作成
       const updatedLesson = { ...lesson };
       
       // キーフレーズの音声を生成
       if (updatedLesson.keyPhrase) {
-        const response = await fetch('/api/text-to-speech', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: updatedLesson.keyPhrase.text,
-            voice: 'nova', // デフォルトの声
-            model: 'tts-1-hd', // 高品質モデル
-            save: true // ファイルとして保存
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error('キーフレーズの音声生成に失敗しました');
+        try {
+          setUploadMessage('キーフレーズの音声を生成中...');
+          
+          const response = await fetch('/api/text-to-speech', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: updatedLesson.keyPhrase.text,
+              voice: 'nova', // デフォルトの声
+              model: 'tts-1-hd', // 高品質モデル
+              save: true // ファイルとして保存
+            }),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`APIエラー: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          updatedLesson.keyPhrase.audioUrl = data.audioUrl;
+          console.log('キーフレーズの音声を生成しました:', data.audioUrl);
+        } catch (error) {
+          console.error('キーフレーズの音声生成エラー:', error);
+          failedPhrases.push({ 
+            type: 'keyPhrase', 
+            text: updatedLesson.keyPhrase.text 
+          });
         }
-        
-        const data = await response.json();
-        updatedLesson.keyPhrase.audioUrl = data.audioUrl;
       }
       
       // ダイアログの音声を生成
@@ -1008,25 +1031,65 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
           // スタッフの音声はノヴァ、顧客の音声はオニキスで生成
           const voice = turn.role === 'staff' ? 'nova' : 'onyx';
           
-          const response = await fetch('/api/text-to-speech', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              text: turn.text,
-              voice: voice,
-              model: 'tts-1-hd', // 高品質モデル
-              save: true // ファイルとして保存
-            }),
-          });
-          
-          if (!response.ok) {
-            throw new Error(`ダイアログターン ${i+1} の音声生成に失敗しました`);
+          try {
+            setUploadMessage(`ダイアログ ${i+1}/${updatedLesson.dialogueTurns.length} の音声を生成中...`);
+            
+            // 最大3回リトライ
+            let retryCount = 0;
+            let success = false;
+            let lastError;
+            
+            while (retryCount < 3 && !success) {
+              try {
+                const response = await fetch('/api/text-to-speech', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    text: turn.text,
+                    voice: voice,
+                    model: 'tts-1-hd', // 高品質モデル
+                    save: true // ファイルとして保存
+                  }),
+                });
+                
+                if (!response.ok) {
+                  throw new Error(`APIエラー: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+                
+                updatedLesson.dialogueTurns[i].audioUrl = data.audioUrl;
+                console.log(`ダイアログ ${i+1} の音声を生成しました:`, data.audioUrl);
+                success = true;
+              } catch (error) {
+                lastError = error;
+                retryCount++;
+                console.warn(`ダイアログ ${i+1} の音声生成に失敗 (${retryCount}/3):`, error);
+                
+                // リトライ前に少し待機
+                if (retryCount < 3) {
+                  await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                }
+              }
+            }
+            
+            // 全てのリトライが失敗した場合
+            if (!success) {
+              throw lastError;
+            }
+          } catch (error) {
+            console.error(`ダイアログ ${i+1} の音声生成エラー:`, error);
+            failedPhrases.push({ 
+              type: 'dialogueTurn', 
+              index: i, 
+              text: turn.text 
+            });
           }
-          
-          const data = await response.json();
-          updatedLesson.dialogueTurns[i].audioUrl = data.audioUrl;
           
           // 進捗状況を更新
           setUploadMessage(`ダイアログ ${i+1}/${updatedLesson.dialogueTurns.length} の音声を生成中...`);
@@ -1048,8 +1111,15 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
       // APIにも保存
       saveLessonsToAPI(updatedLessons);
       
-      setUploadStatus('success');
-      setUploadMessage('レッスン音声の生成が完了しました');
+      // 失敗したフレーズがあれば報告
+      if (failedPhrases.length > 0) {
+        setUploadStatus('warning');
+        setUploadMessage(`レッスン音声の生成が一部完了しました（${failedPhrases.length}件のフレーズに失敗）`);
+        console.warn('生成に失敗したフレーズ:', failedPhrases);
+      } else {
+        setUploadStatus('success');
+        setUploadMessage('レッスン音声の生成が完了しました');
+      }
       
       // 現在のレッスンを更新
       if (currentLesson && currentLesson.id === updatedLesson.id) {
@@ -1449,18 +1519,6 @@ export default function LessonManager({ onSelectLesson, currentLessonId }: Lesso
                   onChange={handleInputChange}
                   className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
                   placeholder="例: レッスン29: Would you like to do a treatment as well?"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">開始ボタンテキスト</label>
-                <input
-                  type="text"
-                  name="startButtonText"
-                  value={formData.startButtonText}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500 text-black"
-                  placeholder="例: レッスン開始"
                 />
               </div>
             </div>
