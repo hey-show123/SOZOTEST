@@ -118,16 +118,18 @@ export default function InteractiveDialoguePractice({
       if (dialogue[0].role === 'customer') {
         // 少し遅延させてから再生
         setTimeout(() => {
-          setAudioText(dialogue[0].text);
-          setIsAudioPlaying(true);
-          setIsAvatarSpeaking(true);
-          
-          // 会話履歴に追加
-          setConversationHistory([{
-            role: 'customer',
-            text: dialogue[0].text,
-            translation: dialogue[0].translation
-          }]);
+          // 既に音声が再生中でないことを確認
+          if (!isAudioPlaying) {
+            console.log('初期セットアップ - お客さんの発言を自動再生');
+            playDialogueAudio(dialogue[0]);
+            
+            // 会話履歴に追加
+            setConversationHistory([{
+              role: 'customer',
+              text: dialogue[0].text,
+              translation: dialogue[0].translation
+            }]);
+          }
         }, 1000);
       }
     }
@@ -141,23 +143,24 @@ export default function InteractiveDialoguePractice({
       const newLine = dialogue[currentTurn - 1];
       setCurrentLine(newLine);
       
-      // お客さんのセリフなら自動再生
-      if (newLine && newLine.role === 'customer') {
+      // お客さんのセリフなら自動再生（既に再生中でない場合のみ）
+      if (newLine && newLine.role === 'customer' && !isAudioPlaying) {
         setTimeout(() => {
-          // お客さんのセリフを自動再生
-          setAudioText(newLine.text);
-          setIsAudioPlaying(true);
-          setIsAvatarSpeaking(true); // 音声再生時にアバターの会話状態をON
-          
-          // 会話履歴に追加
-          setConversationHistory(prev => [
-            ...prev,
-            {
-              role: 'customer',
-              text: newLine.text,
-              translation: newLine.translation
-            }
-          ]);
+          // お客さんのセリフを自動再生（二重チェック）
+          if (!isAudioPlaying) {
+            console.log('ターン変更 - お客さんの発言を自動再生');
+            playDialogueAudio(newLine);
+            
+            // 会話履歴に追加
+            setConversationHistory(prev => [
+              ...prev,
+              {
+                role: 'customer',
+                text: newLine.text,
+                translation: newLine.translation
+              }
+            ]);
+          }
         }, 500);
       }
     }
@@ -165,11 +168,12 @@ export default function InteractiveDialoguePractice({
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
+    console.log('音声再生終了ハンドラー呼び出し');
     setIsAudioPlaying(false);
+    setIsAvatarSpeaking(false);
     
     // 現在のターンがお客さんの場合は自動で次へ進む
     if (currentLine && currentLine.role === 'customer') {
-      setIsAvatarSpeaking(false);
       setTimeout(() => {
         const nextTurn = currentTurn + 1;
         
@@ -353,6 +357,12 @@ export default function InteractiveDialoguePractice({
   // 会話ターンの音声を再生
   const playDialogueAudio = (turn: DialogueTurn) => {
     console.log('音声再生開始:', turn);
+    
+    // 既に再生中の場合は何もしない
+    if (isAudioPlaying) {
+      console.log('すでに音声再生中のため、新しい再生をスキップします');
+      return;
+    }
     
     // 事前生成された音声ファイルがある場合はそれを優先
     if (turn.audioUrl) {

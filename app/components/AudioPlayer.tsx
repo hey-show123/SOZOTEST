@@ -159,6 +159,13 @@ export default function AudioPlayer({
     
     console.log('[AudioPlayer] 音声URL変更:', audioUrl);
     
+    // 以前の再生を停止（重複再生防止）
+    if (audioRef.current) {
+      console.log('[AudioPlayer] 既存の再生を停止');
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+    }
+    
     let isEffectActive = true; // このエフェクト実行中かどうかを追跡
 
     const playAudio = async () => {
