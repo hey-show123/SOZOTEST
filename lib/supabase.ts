@@ -47,6 +47,35 @@ try {
         throw error;
       }
       console.log('✅ Supabase接続確認: 成功');
+      
+      // ストレージバケットの確認
+      try {
+        const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('audio-files');
+        if (bucketError) {
+          console.warn('⚠️ Supabaseストレージバケット確認: 失敗', bucketError.message);
+          console.log('バケットが存在しない場合は作成を試みます');
+          
+          try {
+            const { data: createData, error: createError } = await supabase.storage.createBucket('audio-files', {
+              public: true,
+              allowedMimeTypes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aiff'],
+              fileSizeLimit: 5242880, // 5MB
+            });
+            
+            if (createError) {
+              console.error('❌ バケット作成エラー:', createError.message);
+            } else {
+              console.log('✅ バケット作成成功:', createData);
+            }
+          } catch (createErr) {
+            console.error('❌ バケット作成例外:', createErr);
+          }
+        } else {
+          console.log('✅ Supabaseストレージバケット確認: 成功', bucketData);
+        }
+      } catch (bucketErr) {
+        console.error('❌ バケット確認例外:', bucketErr);
+      }
     } catch (err) {
       console.error('❌ Supabase接続失敗:', err);
       // 接続失敗時に再試行
@@ -75,7 +104,16 @@ export const LESSONS_TABLE = 'lessons';
 // 開発環境かどうかを判定
 export const isDevelopment = process.env.NODE_ENV === 'development';
 
+// Vercel環境かどうかを判定
+export const isVercelEnv = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+
 // Supabaseが設定されているかどうかをチェック
-export const isSupabaseConfigured = true; // 常にtrueに設定
+export const isSupabaseConfigured = supabaseUrl && supabaseAnonKey && 
+  supabaseUrl !== 'https://your-project-url.supabase.co' && 
+  supabaseAnonKey !== 'your-anon-key';
+
+// 音声ファイルの保存方法を決定
+// Vercel環境ではSupabaseを使用、開発環境ではローカルファイルシステムを使用
+export const useSupabaseStorage = isSupabaseConfigured && !isDevelopment;
 
 export { supabase }; 

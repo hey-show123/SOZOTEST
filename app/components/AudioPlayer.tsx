@@ -37,6 +37,8 @@ export default function AudioPlayer({
   const [showPlayButton, setShowPlayButton] = useState(false);
   const [initialNotification, setInitialNotification] = useState(true);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
   // 外部URLを整形
   const cleanExternalAudioUrl = externalAudioUrl ? sanitizeUrl(externalAudioUrl) : null;
@@ -81,6 +83,7 @@ export default function AudioPlayer({
     if (cleanExternalAudioUrl) {
       console.log('AudioPlayer - 外部音声URLを使用:', cleanExternalAudioUrl);
       setAudioUrl(cleanExternalAudioUrl);
+      setRetryCount(0); // リトライカウントをリセット
       return; // 外部URLがある場合はAPIを呼び出さない
     }
     
@@ -103,7 +106,11 @@ export default function AudioPlayer({
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ text, voice }),
+            body: JSON.stringify({ 
+              text, 
+              voice,
+              save: true // 常にファイルとして保存する
+            }),
           });
 
           if (!response.ok) {
@@ -123,6 +130,16 @@ export default function AudioPlayer({
             const data = await response.json();
             console.log('AudioPlayer - JSONレスポンス:', data);
             
+            // エラーチェック
+            if (data.error) {
+              console.error('AudioPlayer - APIエラーレスポンス:', data.error);
+              setAudioError(`API処理エラー: ${data.error}`);
+              if (onFinished) {
+                onFinished();
+              }
+              return;
+            }
+            
             // ダミーの音声URLの場合は特別処理
             if (data.isDummy) {
               console.log('ダミー音声URLが返されました。APIキーが設定されていません。');
@@ -135,16 +152,35 @@ export default function AudioPlayer({
             }
             
             // URLを整形してから設定
+            if (!data.audioUrl) {
+              console.error('AudioPlayer - 音声URLがレスポンスに含まれていません:', data);
+              setAudioError('音声URLが取得できませんでした');
+              if (onFinished) {
+                onFinished();
+              }
+              return;
+            }
+            
             const cleanUrl = sanitizeUrl(data.audioUrl);
-            setAudioUrl(cleanUrl);
             console.log('AudioPlayer - 音声URL設定:', cleanUrl);
+            
+            if (!cleanUrl) {
+              console.error('AudioPlayer - 音声URLが無効です:', data.audioUrl);
+              setAudioError('無効な音声URLです');
+              if (onFinished) {
+                onFinished();
+              }
+              return;
+            }
+            
+            setAudioUrl(cleanUrl);
           } else {
             // バイナリレスポンスの場合（新規生成された音声）
             // 音声データを取得してBlobに変換
             const audioBlob = await response.blob();
             console.log('AudioPlayer - バイナリレスポンス:', audioBlob.size, 'bytes');
             // 既存のURLを解放
-            if (audioUrl) {
+            if (audioUrl && audioUrl.startsWith('blob:')) {
               URL.revokeObjectURL(audioUrl);
             }
             const newAudioUrl = URL.createObjectURL(audioBlob);
@@ -154,6 +190,16 @@ export default function AudioPlayer({
         } catch (error) {
           console.error('音声生成エラー:', error);
           setAudioError(`音声生成エラー: ${error instanceof Error ? error.message : String(error)}`);
+          
+          // リトライ処理
+          if (retryCount < MAX_RETRIES) {
+            console.log(`AudioPlayer - リトライ (${retryCount + 1}/${MAX_RETRIES})...`);
+            setRetryCount(prev => prev + 1);
+            // 少し待ってから再試行
+            setTimeout(generateTTS, 1000);
+            return;
+          }
+          
           setShowPlayButton(false);
           // エラー時は再生を行わず、完了ハンドラを呼び出して処理を続行
           if (onFinished) {
@@ -179,7 +225,7 @@ export default function AudioPlayer({
         URL.revokeObjectURL(audioUrl);
       }
     };
-  }, [text, voice, cleanExternalAudioUrl]);
+  }, [text, voice, cleanExternalAudioUrl, retryCount]);
 
   // 音声URLが変更されたときに再生
   useEffect(() => {
@@ -200,7 +246,17 @@ export default function AudioPlayer({
           // エラーハンドラーを設定
           audioRef.current.onerror = (e) => {
             console.error('音声読み込みエラー:', e);
-            setAudioError(`音声ファイルの読み込みに失敗しました: ${audioUrl}`);
+            const errorMsg = `音声ファイルの読み込みに失敗しました: ${audioUrl}`;
+            console.error(errorMsg);
+            setAudioError(errorMsg);
+            
+            // リトライ処理
+            if (retryCount < MAX_RETRIES && !cleanExternalAudioUrl) {
+              console.log(`AudioPlayer - 読み込みリトライ (${retryCount + 1}/${MAX_RETRIES})...`);
+              setRetryCount(prev => prev + 1);
+              return;
+            }
+            
             if (onFinished) {
               onFinished();
             }
@@ -244,7 +300,17 @@ export default function AudioPlayer({
           // エラーハンドラーを設定
           audio.onerror = (e) => {
             console.error('音声読み込みエラー:', e);
-            setAudioError(`音声ファイルの読み込みに失敗しました: ${audioUrl}`);
+            const errorMsg = `音声ファイルの読み込みに失敗しました: ${audioUrl}`;
+            console.error(errorMsg);
+            setAudioError(errorMsg);
+            
+            // リトライ処理
+            if (retryCount < MAX_RETRIES && !cleanExternalAudioUrl) {
+              console.log(`AudioPlayer - 読み込みリトライ (${retryCount + 1}/${MAX_RETRIES})...`);
+              setRetryCount(prev => prev + 1);
+              return;
+            }
+            
             if (onFinished) {
               onFinished();
             }
@@ -300,7 +366,7 @@ export default function AudioPlayer({
         audioRef.current.onerror = null; // エラーリスナーを削除
       }
     };
-  }, [audioUrl, autoPlay, hasInteracted]);
+  }, [audioUrl, autoPlay, hasInteracted, retryCount]);
 
   // 手動で音声を再生
   const handlePlay = async () => {

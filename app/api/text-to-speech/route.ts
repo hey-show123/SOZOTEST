@@ -97,14 +97,20 @@ async function uploadToS3(key: string, buffer: Buffer, contentType: string = 'au
 
 // 音声ファイルを保存するディレクトリを作成（ローカル開発用）
 async function ensureAudioDirExists() {
-  const publicDir = path.join(process.cwd(), 'public');
-  const audioDir = path.join(publicDir, 'audio');
-  
-  if (!existsSync(audioDir)) {
-    await mkdir(audioDir, { recursive: true });
+  try {
+    const publicDir = path.join(process.cwd(), 'public');
+    const audioDir = path.join(publicDir, 'audio');
+    
+    if (!existsSync(audioDir)) {
+      await mkdir(audioDir, { recursive: true });
+      console.log('音声ディレクトリを作成しました:', audioDir);
+    }
+    
+    return audioDir;
+  } catch (error) {
+    console.error('音声ディレクトリ作成エラー:', error);
+    throw error;
   }
-  
-  return audioDir;
 }
 
 // テキストを適切な長さに分割する関数
@@ -186,9 +192,15 @@ const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
 const STORAGE_BUCKET = 'audio-files';
 
 // ディレクトリが存在しない場合は作成する関数
-function ensureDirectoryExists(dir: string): void {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+async function ensureDirectoryExists(dir: string): Promise<void> {
+  try {
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+      console.log('ディレクトリを作成しました:', dir);
+    }
+  } catch (error) {
+    console.error('ディレクトリ作成エラー:', error);
+    throw error;
   }
 }
 
@@ -218,60 +230,28 @@ export async function POST(req: Request) {
     const fileName = generateFileName(text, voice);
     let audioUrl = '';
 
+    console.log('TTS API - リクエスト受信:', { textLength: text.length, voice, model, save });
+
     // ファイルを保存するかどうか
     if (save) {
       // Supabaseが設定されていない場合か開発環境の場合はローカルに保存
       if (!isSupabaseConfigured || isDevelopment) {
-        // ディレクトリが存在しない場合は作成
-        ensureDirectoryExists(AUDIO_DIR);
-
-        // 保存先のパス
-        const filePath = path.join(AUDIO_DIR, fileName);
-        
-        // ファイルが既に存在するか確認
-        if (fs.existsSync(filePath)) {
-          // 既存のファイルを使用
-          audioUrl = `/audio/${fileName}`;
-          
-          return NextResponse.json({
-            audioUrl,
-            cached: true
-          });
-        }
-        
-        // OpenAI APIを呼び出して音声を生成
-        const mp3 = await openai.audio.speech.create({
-          model: model,
-          voice: voice,
-          input: text,
-        });
-
-        // 音声データをバッファに変換
-        const buffer = Buffer.from(await mp3.arrayBuffer());
-        
-        // ファイルに保存
-        fs.writeFileSync(filePath, buffer);
-        
-        // 音声URLを設定
-        audioUrl = `/audio/${fileName}`;
-      } else {
-        // 本番環境: Supabaseのストレージに保存
         try {
-          // ファイルがすでに存在するか確認
-          const { data: existingFile, error: checkError } = await supabase
-            .storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(fileName);
+          console.log('TTS API - ローカルファイルシステムに保存します');
           
-          if (checkError) {
-            console.error('Supabase存在確認エラー:', checkError);
-            throw new Error(`Supabase存在確認エラー: ${checkError.message}`);
-          }
+          // ディレクトリが存在しない場合は作成
+          await ensureDirectoryExists(AUDIO_DIR);
+          console.log('TTS API - 音声ディレクトリ確認完了:', AUDIO_DIR);
+
+          // 保存先のパス
+          const filePath = path.join(AUDIO_DIR, fileName);
+          console.log('TTS API - 保存先ファイルパス:', filePath);
           
-          if (existingFile) {
-            // 既存のファイルのURLを使用
-            audioUrl = sanitizeUrl(existingFile.publicUrl);
-            console.log('既存の音声ファイルを使用:', audioUrl);
+          // ファイルが既に存在するか確認
+          if (existsSync(filePath)) {
+            // 既存のファイルを使用
+            audioUrl = `/audio/${fileName}`;
+            console.log('TTS API - 既存のファイルを使用:', audioUrl);
             
             return NextResponse.json({
               audioUrl,
@@ -280,7 +260,7 @@ export async function POST(req: Request) {
           }
           
           // OpenAI APIを呼び出して音声を生成
-          console.log('OpenAI APIで音声生成中...');
+          console.log('TTS API - OpenAI APIで音声生成中...');
           const mp3 = await openai.audio.speech.create({
             model: model,
             voice: voice,
@@ -289,10 +269,62 @@ export async function POST(req: Request) {
 
           // 音声データをバッファに変換
           const buffer = Buffer.from(await mp3.arrayBuffer());
-          console.log('音声バッファを取得:', buffer.length, 'バイト');
+          console.log('TTS API - 音声バッファを取得:', buffer.length, 'バイト');
+          
+          // ファイルに保存
+          console.log('TTS API - ファイルに保存中...');
+          await writeFile(filePath, buffer);
+          console.log('TTS API - ファイル保存完了:', filePath);
+          
+          // 音声URLを設定
+          audioUrl = `/audio/${fileName}`;
+          console.log('TTS API - 音声URL設定:', audioUrl);
+        } catch (error) {
+          console.error('TTS API - ローカル保存エラー:', error);
+          throw new Error(`ローカルファイル保存エラー: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else {
+        // 本番環境: Supabaseのストレージに保存
+        try {
+          console.log('TTS API - Supabaseストレージに保存します');
+          
+          // ファイルがすでに存在するか確認
+          console.log('TTS API - Supabaseでファイル存在確認中...');
+          const { data: existingFile, error: checkError } = await supabase
+            .storage
+            .from(STORAGE_BUCKET)
+            .getPublicUrl(fileName);
+          
+          if (checkError) {
+            console.error('TTS API - Supabase存在確認エラー:', checkError);
+            throw new Error(`Supabase存在確認エラー: ${checkError.message}`);
+          }
+          
+          if (existingFile && existingFile.publicUrl) {
+            // 既存のファイルのURLを使用
+            audioUrl = sanitizeUrl(existingFile.publicUrl);
+            console.log('TTS API - 既存の音声ファイルを使用:', audioUrl);
+            
+            return NextResponse.json({
+              audioUrl,
+              cached: true
+            });
+          }
+          
+          // OpenAI APIを呼び出して音声を生成
+          console.log('TTS API - OpenAI APIで音声生成中...');
+          const mp3 = await openai.audio.speech.create({
+            model: model,
+            voice: voice,
+            input: text,
+          });
+
+          // 音声データをバッファに変換
+          const buffer = Buffer.from(await mp3.arrayBuffer());
+          console.log('TTS API - 音声バッファを取得:', buffer.length, 'バイト');
           
           // Supabaseのストレージにアップロード
-          console.log('Supabaseにアップロード中...');
+          console.log('TTS API - Supabaseにアップロード中...');
           const { data, error } = await supabase
             .storage
             .from(STORAGE_BUCKET)
@@ -302,38 +334,39 @@ export async function POST(req: Request) {
             });
           
           if (error) {
-            console.error('Supabaseアップロードエラー:', error);
+            console.error('TTS API - Supabaseアップロードエラー:', error);
             throw new Error('Supabaseへの音声ファイルアップロードエラー: ' + error.message);
           }
           
           // 公開URLを取得
+          console.log('TTS API - 公開URL取得中...');
           const { data: urlData, error: urlError } = await supabase
             .storage
             .from(STORAGE_BUCKET)
             .getPublicUrl(fileName);
           
-          if (urlError) {
-            console.error('Supabase公開URL取得エラー:', urlError);
-            throw new Error('公開URL取得エラー: ' + urlError.message);
+          if (urlError || !urlData) {
+            console.error('TTS API - Supabase公開URL取得エラー:', urlError);
+            throw new Error('公開URL取得エラー: ' + (urlError ? urlError.message : 'URLデータなし'));
           }
           
           audioUrl = sanitizeUrl(urlData.publicUrl);
-          console.log('音声ファイルのURL:', audioUrl);
+          console.log('TTS API - 音声ファイルのURL:', audioUrl);
         } catch (error) {
-          console.error('Supabase処理エラー、ローカルファイルシステムにフォールバック:', error);
+          console.error('TTS API - Supabase処理エラー、ローカルファイルシステムにフォールバック:', error);
           
           // エラー時はローカルに保存
           try {
             // ディレクトリ確認
-            console.log('ローカルファイルシステムにフォールバック');
-            ensureDirectoryExists(AUDIO_DIR);
-            console.log('ディレクトリ確認:', AUDIO_DIR);
+            console.log('TTS API - ローカルファイルシステムにフォールバック');
+            await ensureDirectoryExists(AUDIO_DIR);
+            console.log('TTS API - ディレクトリ確認:', AUDIO_DIR);
             
             const filePath = path.join(AUDIO_DIR, fileName);
-            console.log('保存先ファイルパス:', filePath);
+            console.log('TTS API - 保存先ファイルパス:', filePath);
             
             // OpenAI APIを呼び出して音声を生成（再度呼び出し）
-            console.log('OpenAI APIで音声を再生成中...');
+            console.log('TTS API - OpenAI APIで音声を再生成中...');
             const mp3 = await openai.audio.speech.create({
               model: model,
               voice: voice,
@@ -342,18 +375,18 @@ export async function POST(req: Request) {
             
             // 音声データをバッファに変換
             const buffer = Buffer.from(await mp3.arrayBuffer());
-            console.log('音声バッファを取得:', buffer.length, 'バイト');
+            console.log('TTS API - 音声バッファを取得:', buffer.length, 'バイト');
             
             // ファイルに保存
-            console.log('ファイルに保存中...');
-            fs.writeFileSync(filePath, buffer);
-            console.log('ファイル保存完了:', filePath);
+            console.log('TTS API - ファイルに保存中...');
+            await writeFile(filePath, buffer);
+            console.log('TTS API - ファイル保存完了:', filePath);
             
             // 音声URLを設定
             audioUrl = `/audio/${fileName}`;
-            console.log('音声URL設定:', audioUrl);
+            console.log('TTS API - 音声URL設定:', audioUrl);
           } catch (saveError) {
-            console.error('ローカル保存エラー:', saveError);
+            console.error('TTS API - ローカル保存エラー:', saveError);
             throw new Error('ローカルファイル保存エラー: ' + (saveError instanceof Error ? saveError.message : String(saveError)));
           }
         }
@@ -365,6 +398,7 @@ export async function POST(req: Request) {
       });
     } else {
       // ファイルを保存せずに音声を生成
+      console.log('TTS API - ファイルを保存せずに音声を生成します');
       const mp3 = await openai.audio.speech.create({
         model: model,
         voice: voice,
@@ -374,6 +408,7 @@ export async function POST(req: Request) {
       // 音声データをバッファに変換してBase64にエンコード
       const buffer = Buffer.from(await mp3.arrayBuffer());
       const base64Audio = buffer.toString('base64');
+      console.log('TTS API - Base64音声データを生成:', base64Audio.substring(0, 50) + '...');
       
       return NextResponse.json({
         audioBase64: `data:audio/mpeg;base64,${base64Audio}`,
@@ -382,6 +417,9 @@ export async function POST(req: Request) {
     }
   } catch (error: any) {
     console.error('TTS APIエラー:', error);
-    return NextResponse.json({ error: error.message || 'エラーが発生しました' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message || 'エラーが発生しました',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
   }
 } 
