@@ -1,0 +1,1 @@
+{"framework":"nextjs","github":{"silent":true},"buildCommand":"npm run build","installCommand":"npm install","outputDirectory":".next","env":{"NEXT_TELEMETRY_DISABLED":"1","NEXT_DISABLE_ESLINT":"1","NEXT_DISABLE_TYPE_CHECKS":"1"}}
