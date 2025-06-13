@@ -1,0 +1,4 @@
+# 問題のあるファイルを除外
+app/admin/tts-debug
+app/components/admin/AudioFilesList.tsx
+app/api/generate-tts-audio
