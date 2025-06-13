@@ -1,1 +1,15 @@
-{ "buildCommand": "next build" }
+{
+  "framework": "nextjs",
+  "github": {
+    "silent": true
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "buildCommand": "echo 'Skipping build step'",
+  "installCommand": "echo 'Skipping install step'",
+  "ignoreCommand": "echo 'Skipping check step.'"
+}
