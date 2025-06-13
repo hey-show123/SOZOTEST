@@ -2,6 +2,37 @@ import { NextResponse } from 'next/server';
 import { supabase, LESSONS_TABLE, isDevelopment, isSupabaseConfigured } from '@/lib/supabase';
 import { DEFAULT_LESSONS } from '@/app/constants/defaultLessons';
 
+// URLを整形する関数（改行や空白を削除）
+function sanitizeUrl(url: string): string {
+  if (!url) return url;
+  // URLから改行と余分な空白を削除
+  return url.replace(/[\r\n\s]+/g, '');
+}
+
+// レッスンデータ内の音声URLを整形する関数
+function sanitizeLessonUrls(lesson: any): any {
+  if (!lesson) return lesson;
+  
+  const cleanedLesson = { ...lesson };
+  
+  // キーフレーズの音声URL
+  if (cleanedLesson.keyPhrase?.audioUrl) {
+    cleanedLesson.keyPhrase.audioUrl = sanitizeUrl(cleanedLesson.keyPhrase.audioUrl);
+  }
+  
+  // ダイアログターンの音声URL
+  if (Array.isArray(cleanedLesson.dialogueTurns)) {
+    cleanedLesson.dialogueTurns = cleanedLesson.dialogueTurns.map(turn => {
+      if (turn.audioUrl) {
+        return { ...turn, audioUrl: sanitizeUrl(turn.audioUrl) };
+      }
+      return turn;
+    });
+  }
+  
+  return cleanedLesson;
+}
+
 // GETリクエスト（レッスンデータの取得）
 export async function GET() {
   try {
@@ -113,10 +144,13 @@ export async function GET() {
       });
     }
     
-    console.log(`Supabaseから${data.length}件のレッスンデータを取得しました`);
+    // 音声URLを整形
+    const sanitizedData = data.map(lesson => sanitizeLessonUrls(lesson));
+    
+    console.log(`Supabaseから${sanitizedData.length}件のレッスンデータを取得しました`);
     return NextResponse.json({ 
-      lessons: data,
-      debug: { count: data.length }
+      lessons: sanitizedData,
+      debug: { count: sanitizedData.length }
     });
   } catch (error) {
     console.error('レッスンデータ取得エラー:', error);
@@ -244,21 +278,34 @@ export async function POST(request: Request) {
           tags: Array.isArray(lesson.tags) ? lesson.tags : [],
         };
         
+        // 音声URLを整形
+        const sanitizedLesson = sanitizeLessonUrls(cleanLesson);
+        
         const { error } = await supabase
           .from(LESSONS_TABLE)
-          .insert(cleanLesson);
+          .insert(sanitizedLesson);
         
         if (error) {
-          console.error(`ID「${lesson.id}」のレッスン保存エラー:`, error);
+          console.error(`レッスン「${lesson.title}」の保存エラー:`, error);
           errorCount++;
-          errors.push({ id: lesson.id, error: error.message });
+          errors.push({
+            lessonId: lesson.id,
+            lessonTitle: lesson.title,
+            error: error.message,
+            code: error.code,
+            details: error.details
+          });
         } else {
           successCount++;
         }
-      } catch (e) {
-        console.error(`ID「${lesson.id}」のレッスン保存例外:`, e);
+      } catch (error) {
+        console.error(`レッスン処理エラー:`, error);
         errorCount++;
-        errors.push({ id: lesson.id, error: e instanceof Error ? e.message : String(e) });
+        errors.push({
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
     }
     
@@ -267,8 +314,7 @@ export async function POST(request: Request) {
     if (errorCount > 0) {
       return NextResponse.json({ 
         success: successCount > 0,
-        partialSuccess: successCount > 0,
-        error: '一部のレッスンデータの保存に失敗しました',
+        partialSuccess: errorCount < lessons.length,
         successCount,
         errorCount,
         errors
@@ -283,8 +329,8 @@ export async function POST(request: Request) {
     console.error('レッスンデータ保存エラー:', error);
     return NextResponse.json({ 
       success: false,
-      error: 'レッスンデータの保存に失敗しました',
-      debug: { error: error instanceof Error ? error.message : String(error) }
+      error: 'レッスンデータの保存中にエラーが発生しました',
+      details: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
   }
 } 

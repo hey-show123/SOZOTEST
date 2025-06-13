@@ -22,6 +22,12 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   // 使用するキーフレーズ（propsから受け取るか、デフォルト値を使用）
   const phraseToUse = keyPhrase || defaultKeyPhrase;
 
+  // デバッグ用：キーフレーズとaudioUrlをコンソールに出力
+  useEffect(() => {
+    console.log('SimplePhrasePractice - キーフレーズ:', phraseToUse);
+    console.log('SimplePhrasePractice - 音声URL:', phraseToUse.audioUrl);
+  }, [phraseToUse]);
+
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -132,8 +138,18 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
 
   // キーフレーズを再生
   const playKeyPhrase = () => {
+    // 音声URLの存在を確認してコンソールに出力
+    console.log('再生しようとしている音声URL:', phraseToUse.audioUrl);
+    
     // 事前生成された音声ファイルがある場合はそれを優先、なければテキストを設定
-    setAudioText(phraseToUse.audioUrl ? '' : phraseToUse.text);
+    if (phraseToUse.audioUrl) {
+      console.log('事前生成された音声URLを使用します:', phraseToUse.audioUrl);
+      setAudioText('');
+    } else {
+      console.log('音声URLがないため、テキストから生成します:', phraseToUse.text);
+      setAudioText(phraseToUse.text);
+    }
+    
     setIsAudioPlaying(true);
     setIsAvatarSpeaking(true); // アバターの会話状態をON
   };
