@@ -78,13 +78,24 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     // すでに再生済みの場合は実行しない
     if (initialPlayDone) return;
     
+    // 音声URLをログに出力（デバッグ用）
+    console.log('SimplePhrasePractice - 初期表示時の音声URL:', phraseToUse.audioUrl || '未設定');
+    
     // 少し遅延させて再生（画面表示後に再生するため）
     const timer = setTimeout(() => {
-      playKeyPhrase();
+      console.log('SimplePhrasePractice - 初期再生を開始します');
+      // audioTextとaudioUrlを一度だけ設定
+      if (phraseToUse.audioUrl) {
+        setAudioText(''); // audioUrlがある場合はテキストを空にする
+      } else {
+        setAudioText(phraseToUse.text); // audioUrlがなければテキストから生成
+      }
+      setIsAudioPlaying(true); // 再生状態をONにする
+      setIsAvatarSpeaking(true); // アバターの会話状態をON
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [initialPlayDone]);
+  }, [initialPlayDone, phraseToUse.audioUrl, phraseToUse.text]);
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
@@ -138,6 +149,12 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
 
   // キーフレーズを再生
   const playKeyPhrase = () => {
+    // ボタンクリックによる手動再生の場合は、既に再生中でないことを確認
+    if (isAudioPlaying) {
+      console.log('SimplePhrasePractice - 既に再生中のため重複再生をスキップします');
+      return;
+    }
+    
     // 音声URLの存在を確認してコンソールに出力
     console.log('再生しようとしている音声URL:', phraseToUse.audioUrl);
     
