@@ -110,10 +110,6 @@ export default function AudioPlayer({
   const [autoPlayTriggered, setAutoPlayTriggered] = useState(false);
   const previousUrlRef = useRef<string | null>(null); // 前回のURLを記録するためのref
   
-  // 自動再生試行回数の追跡
-  const autoPlayAttemptsRef = useRef(0);
-  const MAX_AUTO_PLAY_ATTEMPTS = 5; // 試行回数を増やす
-
   // 外部URLを整形してキャッシュバスティングを追加
   const cleanExternalAudioUrl = externalAudioUrl ? sanitizeUrl(externalAudioUrl) : null;
 
@@ -428,7 +424,6 @@ export default function AudioPlayer({
     let isEffectActive = true; // このエフェクト実行中かどうかを追跡
     onFinishedCalledRef.current = false; // 音声URL変更時にフラグをリセット
     setAutoPlayTriggered(false); // 自動再生トリガーをリセット
-    autoPlayAttemptsRef.current = 0; // 再生試行回数をリセット
 
     // 強制的に音声を有効化する試み
     if (typeof window !== 'undefined' && window.forceEnableAudio) {
@@ -440,40 +435,20 @@ export default function AudioPlayer({
     }
 
     const attemptAutoPlay = async () => {
-      // 既に最大試行回数に達している場合は中止
-      if (autoPlayAttemptsRef.current >= MAX_AUTO_PLAY_ATTEMPTS) {
-        console.log(`AudioPlayer - 自動再生の最大試行回数(${MAX_AUTO_PLAY_ATTEMPTS})に達しました`);
-        // 再生ボタンを表示して手動再生を促す
-        setShowPlayButton(true);
-        // 自動再生ができない場合は、ユーザーのエクスペリエンスを向上させるために完了ハンドラを呼び出す
-        if (onFinished && !onFinishedCalledRef.current) {
-          console.log('AudioPlayer - 自動再生失敗のため完了ハンドラを呼び出し');
-          onFinishedCalledRef.current = true;
-          setTimeout(() => {
-            onFinished();
-          }, 500);
-        }
-        return;
-      }
-      
-      autoPlayAttemptsRef.current++;
-      
       try {
         if (!audioRef.current || !isEffectActive || !audioRef.current.src) return;
         
-        // 再生前に無音再生を試みる（最初の試行でのみ）
-        if (autoPlayAttemptsRef.current === 1) {
-          simulateUserInteraction();
-        }
+        // 再生前に無音再生を試みる
+        simulateUserInteraction();
         
-        console.log(`AudioPlayer - 自動再生試行 #${autoPlayAttemptsRef.current}`);
+        console.log('AudioPlayer - 自動再生を1回だけ試行します');
         
         // 音量を確実に設定
         audioRef.current.volume = 1.0;
         
         // 再生状態の確認（既に再生中なら再試行しない）
         if (!audioRef.current.paused) {
-          console.log('AudioPlayer - 既に再生中のため再試行をスキップします');
+          console.log('AudioPlayer - 既に再生中のため再試行しません');
           setIsPlaying(true);
           setShowPlayButton(false);
           return;
@@ -484,33 +459,22 @@ export default function AudioPlayer({
           await window.forceEnableAudio();
         }
         
-        // 再生を試みる
+        // 再生を試みる (1回のみ)
         await audioRef.current.play();
         console.log('AudioPlayer - 自動再生成功');
         setIsPlaying(true);
         setShowPlayButton(false);
       } catch (error) {
-        console.warn(`自動再生試行 #${autoPlayAttemptsRef.current} 失敗:`, error);
+        console.warn('自動再生失敗:', error);
+        setShowPlayButton(true);
         
-        if (autoPlayAttemptsRef.current < MAX_AUTO_PLAY_ATTEMPTS) {
-          // 少し待ってから再試行（試行間隔を徐々に長くする）
-          const delay = 300 * Math.pow(1.5, autoPlayAttemptsRef.current - 1);
+        // 自動再生ができない場合は、完了ハンドラを呼び出す
+        if (onFinished && !onFinishedCalledRef.current) {
+          console.log('AudioPlayer - 自動再生失敗のため完了ハンドラを呼び出し');
+          onFinishedCalledRef.current = true;
           setTimeout(() => {
-            if (isEffectActive) {
-              attemptAutoPlay();
-            }
-          }, delay);
-        } else {
-          setShowPlayButton(true);
-          
-          // 自動再生ができない場合は、完了ハンドラを呼び出す
-          if (onFinished && !onFinishedCalledRef.current) {
-            console.log('AudioPlayer - 自動再生失敗のため完了ハンドラを呼び出し');
-            onFinishedCalledRef.current = true;
-            setTimeout(() => {
-              onFinished();
-            }, 500);
-          }
+            onFinished();
+          }, 500);
         }
       }
     };
@@ -612,8 +576,6 @@ export default function AudioPlayer({
             // ユーザーインタラクションがあるか強制再生フラグがある場合は再生を試みる
             if (hasInteracted || userInteractionAttemptedRef.current || forceAutoPlay || (typeof window !== 'undefined' && window.hasUserInteracted)) {
               console.log('AudioPlayer - 自動再生を開始します');
-              // 自動再生カウンターをリセット
-              autoPlayAttemptsRef.current = 0;
               attemptAutoPlay();
             } else {
               // インタラクションなしの場合は再生ボタンを表示
@@ -653,17 +615,28 @@ export default function AudioPlayer({
                   audioRef.current.src = blobUrl;
                   audioRef.current.load();
                   
-                  // 読み込み完了後に自動再生を試みる
+                  // 読み込み完了後に1回だけ自動再生を試みる
                   audioRef.current.oncanplaythrough = () => {
                     console.log('AudioPlayer - Blob音声の再生準備完了');
-                    if (autoPlay && !isPlaying) {
-                      attemptAutoPlay();
+                    if (autoPlay && !isPlaying && !autoPlayTriggered) {
+                      setAutoPlayTriggered(true);
+                      console.log('AudioPlayer - Blob音声の再生を1回だけ試行します');
+                      audioRef.current?.play().catch(error => {
+                        console.warn('Blob音声自動再生失敗:', error);
+                        setShowPlayButton(true);
+                      });
                     }
                   };
                 }
               })
               .catch(error => {
                 console.error('AudioPlayer - フェッチによる音声読み込みエラー:', error);
+                if (onFinished && !onFinishedCalledRef.current) {
+                  onFinishedCalledRef.current = true;
+                  setTimeout(() => {
+                    onFinished();
+                  }, 500);
+                }
               });
           } catch (fetchError) {
             console.error('AudioPlayer - フェッチエラー:', fetchError);
