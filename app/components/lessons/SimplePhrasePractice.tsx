@@ -73,29 +73,39 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     }
   }, [isAvatarSpeaking]);
 
+  // useEffectでuseRefを使って初回のみ実行する方法に変更
+  const audioUrlProcessedRef = useRef(false);
+  const initialRenderRef = useRef(true);
+
   // コンポーネントがマウントされたら自動的にキーフレーズを再生する
   useEffect(() => {
-    // すでに再生済みの場合は実行しない
-    if (initialPlayDone) return;
-    
-    // 音声URLをログに出力（デバッグ用）
-    console.log('SimplePhrasePractice - 初期表示時の音声URL:', phraseToUse.audioUrl || '未設定');
-    
-    // 少し遅延させて再生（画面表示後に再生するため）
-    const timer = setTimeout(() => {
-      console.log('SimplePhrasePractice - 初期再生を開始します');
-      // audioTextとaudioUrlを一度だけ設定
-      if (phraseToUse.audioUrl) {
-        setAudioText(''); // audioUrlがある場合はテキストを空にする
-      } else {
-        setAudioText(phraseToUse.text); // audioUrlがなければテキストから生成
-      }
-      setIsAudioPlaying(true); // 再生状態をONにする
-      setIsAvatarSpeaking(true); // アバターの会話状態をON
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [initialPlayDone, phraseToUse.audioUrl, phraseToUse.text]);
+    // 初回レンダリング時のみ実行
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false;
+      
+      // 音声URLをログに出力（デバッグ用）
+      console.log('SimplePhrasePractice - 初期表示時の音声URL:', phraseToUse.audioUrl || '未設定');
+      
+      // 少し遅延させて再生（画面表示後に再生するため）
+      const timer = setTimeout(() => {
+        console.log('SimplePhrasePractice - 初期再生を開始します');
+        // audioTextとaudioUrlを一度だけ設定
+        if (phraseToUse.audioUrl) {
+          // 音声URLが設定されている場合
+          setAudioText(''); // audioUrlがある場合はテキストを空にする
+          audioUrlProcessedRef.current = true; // 処理済みフラグを設定
+        } else {
+          // 音声URLがない場合
+          setAudioText(phraseToUse.text); // テキストから生成
+        }
+        setIsAudioPlaying(true); // 再生状態をONにする
+        setIsAvatarSpeaking(true); // アバターの会話状態をON
+      }, 500);
+
+      // クリーンアップ関数
+      return () => clearTimeout(timer);
+    }
+  }, []); // 依存配列を空にして初回のみ実行
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
@@ -147,7 +157,7 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     }
   };
 
-  // キーフレーズを再生
+  // キーフレーズを再生(ボタンクリック時)
   const playKeyPhrase = () => {
     // ボタンクリックによる手動再生の場合は、既に再生中でないことを確認
     if (isAudioPlaying) {
