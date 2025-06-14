@@ -92,8 +92,25 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
       // 少し遅延させて再生（画面表示後に再生するため）
       const timer = setTimeout(() => {
         console.log('SimplePhrasePractice - 初期再生を開始します');
-        playKeyPhrase();
-      }, 500);
+        
+        // 再生中フラグを設定
+        isPlayingRef.current = true;
+        setIsAudioPlaying(true);
+        setIsAvatarSpeaking(true); // アバターの会話状態をON
+        
+        // 保存されたキーフレーズを使用
+        const currentPhrase = phraseRef.current;
+        
+        // 事前生成された音声ファイルがある場合はそれを優先、なければテキストを設定
+        if (currentPhrase.audioUrl) {
+          setAudioText('');
+        } else {
+          setAudioText(currentPhrase.text);
+        }
+        
+        // AudioPlayerを強制的に再レンダリング
+        setAudioPlayerKey(Date.now());
+      }, 1000); // 1秒遅延に増やす
 
       // クリーンアップ関数
       return () => clearTimeout(timer);
@@ -175,7 +192,9 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     }
     
     // AudioPlayerを強制的に再レンダリング
-    setAudioPlayerKey(Date.now());
+    setTimeout(() => {
+      setAudioPlayerKey(Date.now());
+    }, 100);
   };
 
   // スキップボタンのハンドラー
@@ -196,19 +215,19 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         />
       </div>
       
-      {/* AudioPlayerコンポーネント - キーを使用して再レンダリングを制御 */}
-      {isAudioPlaying && (
+      {/* AudioPlayerコンポーネント - 常に表示するが、状態によって動作を変える */}
+      <div style={{ display: 'none' }}>
         <AudioPlayer
           key={audioPlayerKey}
           text={audioText}
-          autoPlay={true}
+          autoPlay={isAudioPlaying}
           onFinished={handleAudioFinished}
           audioUrl={phraseRef.current.audioUrl}
           forceAutoPlay={true}
           isPlaying={isAudioPlaying}
           setIsPlaying={setIsAudioPlaying}
         />
-      )}
+      </div>
       
       {/* アバターとアシスタント名 */}
       <div className="relative z-10 mb-8 flex flex-col items-center">
