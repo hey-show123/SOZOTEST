@@ -218,6 +218,9 @@ export default function AudioPlayer({
 
   // 外部から音声URLが提供されている場合はそれを使用
   useEffect(() => {
+    // 音声URLの変更をログ出力
+    console.log('AudioPlayer - 音声URLが変更されました: –', cleanExternalAudioUrl);
+    
     if (cleanExternalAudioUrl) {
       console.log('AudioPlayer - 外部音声URLを使用:', cleanExternalAudioUrl);
       
@@ -228,10 +231,36 @@ export default function AudioPlayer({
       }
       
       // 新しいURLを設定して記録
-      setAudioUrl(cleanExternalAudioUrl);
-      previousUrlRef.current = cleanExternalAudioUrl;
+      const urlWithCacheBuster = addCacheBuster(cleanExternalAudioUrl);
+      console.log('AudioPlayer - 音声をセット: –', urlWithCacheBuster);
+      
+      setAudioUrl(urlWithCacheBuster);
+      previousUrlRef.current = cleanExternalAudioUrl; // オリジナルURLを保存
       setRetryCount(0); // リトライカウントをリセット
       onFinishedCalledRef.current = false; // 新しいURLが設定されたらフラグをリセット
+      
+      if (forceAutoPlay) {
+        console.log('AudioPlayer - 音声URL変更時に音声を強制有効化しました');
+        // 音声の強制有効化を試みる
+        if (typeof window !== 'undefined' && window.forceEnableAudio) {
+          window.forceEnableAudio().then(success => {
+            if (success && audioRef.current) {
+              // 少し遅延を入れて再生を試みる
+              setTimeout(() => {
+                if (audioRef.current) {
+                  audioRef.current.play()
+                    .then(() => {
+                      console.log('AudioPlayer - URL変更後の強制再生成功');
+                      setIsPlaying(true);
+                    })
+                    .catch(e => console.error('強制再生エラー:', e));
+                }
+              }, 300);
+            }
+          });
+        }
+      }
+      
       return; // 外部URLがある場合はAPIを呼び出さない
     }
     
@@ -381,7 +410,7 @@ export default function AudioPlayer({
         URL.revokeObjectURL(audioUrl);
       }
     };
-  }, [text, voice, cleanExternalAudioUrl, retryCount]);
+  }, [cleanExternalAudioUrl, text, forceAutoPlay, setIsPlaying]);
 
   // 音声URLが変更されたときに再生
   useEffect(() => {
