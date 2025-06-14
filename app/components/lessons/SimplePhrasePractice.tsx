@@ -20,13 +20,8 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   };
 
   // 使用するキーフレーズ（propsから受け取るか、デフォルト値を使用）
-  const phraseToUse = keyPhrase || defaultKeyPhrase;
-
-  // デバッグ用：キーフレーズとaudioUrlをコンソールに出力
-  useEffect(() => {
-    console.log('SimplePhrasePractice - キーフレーズ:', phraseToUse);
-    console.log('SimplePhrasePractice - 音声URL:', phraseToUse.audioUrl);
-  }, [phraseToUse]);
+  const phraseRef = useRef(keyPhrase || defaultKeyPhrase);
+  const phraseToUse = phraseRef.current;
 
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
@@ -40,12 +35,28 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false); // アバターの話している状態
   const [avatarFeedback, setAvatarFeedback] = useState(''); // アバターのフィードバックメッセージ
   const [currentAvatarIndex, setCurrentAvatarIndex] = useState(0); // 現在表示中のアバター画像インデックス
+  const [audioPlayerKey, setAudioPlayerKey] = useState(Date.now()); // AudioPlayerの強制再レンダリング防止用キー
+
+  // 初期化フラグ
+  const initialRenderRef = useRef(true);
+  const isPlayingRef = useRef(false);
+  const audioInitializedRef = useRef(false);
 
   // アバター画像の配列
   const avatarImages = [
     '/images/avatar/robot1.png',
     '/images/avatar/robot2.png'
   ];
+
+  // デバッグ用：キーフレーズとaudioUrlをコンソールに出力（初回のみ）
+  useEffect(() => {
+    if (initialRenderRef.current) {
+      console.log('SimplePhrasePractice - キーフレーズ:', phraseToUse);
+      console.log('SimplePhrasePractice - 音声URL:', phraseToUse.audioUrl);
+      console.log('SimplePhrasePractice - 初期表示時の音声URL:', phraseToUse.audioUrl || '未設定');
+      initialRenderRef.current = false;
+    }
+  }, []);
 
   // デフォルトアバターへのフォールバック処理
   const getAvatarImageSrc = (index: number) => {
@@ -73,51 +84,26 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     }
   }, [isAvatarSpeaking]);
 
-  // useEffectでuseRefを使って初回のみ実行する方法に変更
-  const audioUrlProcessedRef = useRef(false);
-  const initialRenderRef = useRef(true);
-  const isPlayingRef = useRef(false); // 再生状態を追跡するためのRef
-  const phraseRef = useRef(phraseToUse); // キーフレーズを保持するRef
-
-  // コンポーネントがマウントされたら自動的にキーフレーズを再生する
+  // コンポーネントがマウントされたら自動的にキーフレーズを再生する（初回のみ）
   useEffect(() => {
-    // 初回レンダリング時のみ実行
-    if (initialRenderRef.current) {
-      initialRenderRef.current = false;
-      phraseRef.current = phraseToUse; // キーフレーズを保存
-      
-      // 音声URLをログに出力（デバッグ用）
-      console.log('SimplePhrasePractice - 初期表示時の音声URL:', phraseToUse.audioUrl || '未設定');
+    if (!audioInitializedRef.current && !isPlayingRef.current) {
+      audioInitializedRef.current = true;
       
       // 少し遅延させて再生（画面表示後に再生するため）
       const timer = setTimeout(() => {
-        if (isPlayingRef.current) return; // 既に再生中なら実行しない
-        
         console.log('SimplePhrasePractice - 初期再生を開始します');
-        isPlayingRef.current = true; // 再生中フラグを設定
-        
-        // audioTextとaudioUrlを一度だけ設定
-        if (phraseToUse.audioUrl) {
-          // 音声URLが設定されている場合
-          setAudioText(''); // audioUrlがある場合はテキストを空にする
-          audioUrlProcessedRef.current = true; // 処理済みフラグを設定
-        } else {
-          // 音声URLがない場合
-          setAudioText(phraseToUse.text); // テキストから生成
-        }
-        setIsAudioPlaying(true); // 再生状態をONにする
-        setIsAvatarSpeaking(true); // アバターの会話状態をON
+        playKeyPhrase();
       }, 500);
 
       // クリーンアップ関数
       return () => clearTimeout(timer);
     }
-  }, []); // 依存配列を空にして初回のみ実行
+  }, []);
 
   // 音声の再生が終了したときのハンドラー
   const handleAudioFinished = () => {
     setIsAudioPlaying(false);
-    isPlayingRef.current = false; // 再生中フラグをリセット
+    isPlayingRef.current = false;
     setInitialPlayDone(true); // 初回再生完了をマーク
     setIsAvatarSpeaking(false); // アバターの会話状態を終了
     
@@ -175,24 +161,21 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
     
     // 再生中フラグを設定
     isPlayingRef.current = true;
+    setIsAudioPlaying(true);
+    setIsAvatarSpeaking(true); // アバターの会話状態をON
     
     // 保存されたキーフレーズを使用
     const currentPhrase = phraseRef.current;
     
-    // 音声URLの存在を確認してコンソールに出力
-    console.log('再生しようとしている音声URL:', currentPhrase.audioUrl);
-    
     // 事前生成された音声ファイルがある場合はそれを優先、なければテキストを設定
     if (currentPhrase.audioUrl) {
-      console.log('事前生成された音声URLを使用します:', currentPhrase.audioUrl);
       setAudioText('');
     } else {
-      console.log('音声URLがないため、テキストから生成します:', currentPhrase.text);
       setAudioText(currentPhrase.text);
     }
     
-    setIsAudioPlaying(true);
-    setIsAvatarSpeaking(true); // アバターの会話状態をON
+    // AudioPlayerを強制的に再レンダリング
+    setAudioPlayerKey(Date.now());
   };
 
   // スキップボタンのハンドラー
@@ -213,11 +196,12 @@ export default function SimplePhrasePractice({ onComplete, avatarImage, keyPhras
         />
       </div>
       
-      {/* 非表示のAudioPlayerコンポーネント */}
-      {initialRenderRef.current === false && (
+      {/* AudioPlayerコンポーネント - キーを使用して再レンダリングを制御 */}
+      {isAudioPlaying && (
         <AudioPlayer
+          key={audioPlayerKey}
           text={audioText}
-          autoPlay={isAudioPlaying}
+          autoPlay={true}
           onFinished={handleAudioFinished}
           audioUrl={phraseRef.current.audioUrl}
           forceAutoPlay={true}
